@@ -1,17 +1,71 @@
 
 
-source(file="torch_lnm_helper_functions.R")
+source(file="R/torch_lnm_helper_functions.R")
 
 
-### Warning: This is Beta Code! There are potentially a lot of errors!
+### Warning: This is Beta Code! 
 
 
-
+#' Latent Network Model with a Torch backend
+#'
+#' Function for creating a Latent Network Model
+#'
+#' @param data lavaan syntax for the SEM model
+#' @param lambda design matrix for factor loadings, lambda matrix
+#' @param vars vector containing names of observed variables
+#' @param latents vector containing names of latent variables
+#' @param lambda_constraint_lst list containing the row, column and value vectors of the constraints of the lambda matrix
+#' @param omega_psi_constraint_lst list containing the row, column and value vectors of the constraints of the omega_psi matrix
+#' @param theta_constraint_lst list containing the row, column and value vectors of the constraints of the theta matrix
+#' @param lasso (optional) boolean to specify if model wants to use LASSO
+#' @param custom_loss (optional) function supplied to allow the model to be fitted to a custom loss function
+#' @param dtype (optional) torch dtype for the model (default torch_float32())
+#' @param device (optional) device type to put the model on. see [torch::torch_device()]
+#'
+#' @return A `torch_lnm` object, which is an `nn_module` (torch object)
+#'
+#' @details
+#' This function instantiates a torch object for computing the model-implied covariance matrix
+#' based on a Latent Network Model. Through `torch`, gradients of this forward model can then
+#' be computed using backpropagation, and the parameters can be optimized using gradient-based
+#' optimization routines from the `torch` package.
+#'
+#' Due to this, it is straightforward to add additional penalties to the standard objective function,
+#' or to write a new objective function altogether.
+#'
+#' @import torch
+#' @import lavaan
+#' @importFrom R6 R6Class
+#'
+#' @name torch_lnm
+#'
+#'
+#' @export
 tensor_lnm <- torch::nn_module(
   classname = "torch_network_model",
-  initialize = function(data,lambda,lambda_constraint_lst = NULL,
+  #' @section Methods:
+  #'
+  #' ## `$initialize(data, lambda, vars, latents)`
+  #' The initialize method. Don't use this, just use [torch_sem()]
+  #'
+  #' ### Arguments
+  #' - `data` lavaan syntax for the SEM model
+  #' - `lambda` design matrix for factor loadings, lambda matrix
+  #' - `vars` vector containing names of observed variables
+  #' - `latents` vector containing names of latent variables
+  #' - `lambda_constraint_lst` list containing the row, column and value vectors of the constraints of the lambda matrix
+  #' - `omega_psi_constraint_lst` list containing the row, column and value vectors of the constraints of the omega_psi matrix
+  #' - `theta_constraint_lst` list containing the row, column and value vectors of the constraints of the theta matrix
+  #' - `lasso` (optional) boolean to specify if model wants to use LASSO
+  #' - `custom_loss` (optional) function supplied to allow the model to be fitted to a custom loss function
+  #' - `dtype` (optional) torch dtype for the model (default torch_float32())
+  #' - `device` (optional) device type to put the model on. see [torch::torch_device()]
+  #'
+  #' ### Value
+  #' A `torch_lnm` object, which is an `nn_module` (torch object)
+  initialize = function(data,lambda,vars,latents , lambda_constraint_lst = NULL,
                         theta_constraint_lst = NULL,omega_psi_constraint_lst = NULL,
-                        vars = NULL, latents = NULL, lasso=FALSE,custom_loss=NULL,dtype = torch_float32(), device = torch_device("cpu")){
+                        lasso=FALSE,custom_loss=NULL,dtype = torch_float32(), device = torch_device("cpu")){
     if (is.null(vars) || is.null(latents)) {
       warning('Must indicate names of observed and latent variables')
     }
@@ -25,24 +79,24 @@ tensor_lnm <- torch::nn_module(
     self$device <- device
     self$dtype <- dtype
     # compute torch settings
-    self$opt <-lnm_mod_to_torch_opts(lambda, lambda_constraint_lst,
+    opt <-lnm_mod_to_torch_opts(lambda, lambda_constraint_lst,
                                      theta_constraint_lst,omega_psi_constraint_lst)
     # initialize the dimensions of the model:
     self$n <- dim(lambda)[1]
     self$m <- dim(lambda)[2]
     self$num_obs <- nrow(data)
     # initialize the parameter vector
-    self$params_vec <- nn_parameter(torch_tensor(self$opt$params_start, dtype = self$dtype, requires_grad = TRUE, device = self$device))
+    self$params_vec <- nn_parameter(torch_tensor(opt$params_start, dtype = self$dtype, requires_grad = TRUE, device = self$device))
     # initialize the parameter constraints
-    self$params_free <- torch_tensor(self$opt$params_free, dtype = torch_bool(), requires_grad = FALSE, device = self$device)
-    self$params_value <- torch_tensor(self$opt$params_value, dtype = self$dtype, requires_grad = FALSE, device = self$device)
+    self$params_free <- torch_tensor(opt$params_free, dtype = torch_bool(), requires_grad = FALSE, device = self$device)
+    self$params_value <- torch_tensor(opt$params_value, dtype = self$dtype, requires_grad = FALSE, device = self$device)
     # other attributes
     self$cov_matrix <- torch_tensor(cov(data[,vars]))
-    self$lambda_matrix_free <- self$opt$lambda_matrix_free
-    self$params_sizes <- self$opt$params_sizes
-    self$params_free_sizes <- self$opt$params_free_sizes
-    self$params_free_sizes_max <- self$opt$params_free_sizes_max
-    self$params_free_starting_pts <- self$opt$params_free_starting_pts
+    self$lambda_matrix_free <- opt$lambda_matrix_free
+    self$params_sizes <- opt$params_sizes
+    self$params_free_sizes <- opt$params_free_sizes
+    self$params_free_sizes_max <- opt$params_free_sizes_max
+    self$params_free_starting_pts <- opt$params_free_starting_pts
     self$lasso_num_params_removed  <- 0
     # duplication indices transforming vech to vec for theta and omega_psi
     self$theta_dup_idx <- torch_tensor(vech_dup_idx(self$n), dtype = torch_long(), requires_grad = FALSE, device = self$device)
@@ -54,7 +108,17 @@ tensor_lnm <- torch::nn_module(
     self$mu <- torch_zeros(self$n, dtype = self$dtype, requires_grad = FALSE, device = self$device)
   },
   
-  
+#' @section Methods:
+#'
+#' ## `$forward()`
+#' Compute the model-implied covariance matrix.
+#' Don't use this; `nn_modules` are callable, so access this method by calling
+#' the object itself as a function, e.g., `my_torch_lnm()`.
+#' In the forward pass, we apply constraints to the parameter vector, and we
+#' create matrix views from it to compute the model-implied covariance matrix.
+#'
+#' ### Value
+#' A `torch_tensor` of the model-implied covariance matrix
   forward = function(compute_sigma = TRUE){
     #Apply constraints for non-free parameters
     self$params <- torch_where(self$params_free, self$params_vec, self$params_value)
@@ -71,17 +135,45 @@ tensor_lnm <- torch::nn_module(
     return(self$sigma)
   }
   ,
+#' @section Methods:
+#'
+#' ## `$loglik()`
+#' Multivariate normal log-likelihood of the data.
+#'
+#'
+#' ### Value
+#' Log-likelihood value (torch scalar)
   loglik = function() {
     px <- distr_multivariate_normal(loc = self$mu, covariance_matrix = self$forward())
     return(px$log_prob(self$data)$sum())
     
   },
+#' @section Methods:
+#'
+#' ## `$lasso_loss()`
+#' Returns lasso loss which is -2 times Multivariate normal log-likelihood of the data + Penalty.
+#'
+#' ### Arguments
+#' - `v` hyperparameter which controls for the penalty term inside the lasso loss function
+#'
+#' ### Value
+#' lasso loss value (torch scalar)
   lasso_loss = function(v) {
-    return(self$loglik() - v*sum(abs(self$omega_psi$t()$reshape(-1)[strict_lower_triangle_idx(self$m)])))
+    return(-2*self$loglik() + v*sum(abs(self$omega_psi$t()$reshape(-1)[strict_lower_triangle_idx(self$m)])))
   }
   ,
+
+#' @section Methods:
+#'
+#' ## `$inverse_Hessian()`
+#' Compute and return the asymptotic covariance matrix of the parameters with
+#' respect to the loss function, which is limited to the -2 times the log-likelihood function
+#'
+#'
+#' ### Value
+#' A `torch_tensor`, representing the ACOV of the free parameters
   inverse_Hessian = function() {
-    g <- autograd_grad(-self$loglik(), self$params_vec, create_graph = TRUE)[[1]]
+    g <- autograd_grad(-2*self$loglik(), self$params_vec, create_graph = TRUE)[[1]]
     H <- torch_jacobian(g, self$params_vec)
     free_idx <- torch_nonzero(self$params_free)$view(-1)
     self$Hinv <- torch_inverse(H[free_idx, ][, free_idx])
@@ -89,14 +181,27 @@ tensor_lnm <- torch::nn_module(
   },
   
   
-  
+#' @section Methods:
+#'
+#' ## `$fit()`
+#' Fit a torch_lnm model using the default maximum likelihood objective.
+#' This function uses the Adam optimizer to estimate the parameters of a torch_slnm
+#'
+#' ### Arguments
+#' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
+#' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
+#' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
+#' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+#'
+#' ### Value
+#' Self, i.e., the `torch_lnm` object with updated parameters  
   fit = function(lrate = 0.05, maxit = 5000, verbose = TRUE, tol = 1e-20) {
     if (verbose) cat("Fitting SEM with Adam optimizer and MVN log-likelihood loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     prev_loss <- 0.0
     for (epoch in 1:maxit) {
       optim$zero_grad()
-      loss <- -self$loglik()
+      loss <- -2*self$loglik()
       if (verbose) {
         cat("\rEpoch:", epoch, " loglik:", -loss$item())
         flush.console()
@@ -114,13 +219,27 @@ tensor_lnm <- torch::nn_module(
     return(invisible(self))
   }
   ,
+#' @section Methods:
+#'
+#' ## `$fit()`
+#' Fit a torch_lnm model using the lasso loss function.
+#' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
+#'
+#' ### Arguments
+#' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
+#' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
+#' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+#' - `v` (Optional) hyperparameter which controls for the penalty term inside the lasso loss function. Default is 1.
+#'
+#' ### Value
+#' Self, i.e., the `torch_lnm` object with updated parameters  
   
   lasso_fit = function(lrate = 0.05, maxit = 5000, tol = 1e-20,v=1){
     optim <- optim_adam(self$params_vec, lr = lrate)
     prev_loss <- 0.0
     for (epoch in 1:maxit) {
       optim$zero_grad()
-      loss <- -self$lasso_loss(v)
+      loss <- self$lasso_loss(v)
       loss$backward()
       optim$step()
       if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
@@ -131,10 +250,27 @@ tensor_lnm <- torch::nn_module(
     if (epoch == maxit) warning("maximum iterations reached")
     return(invisible(self))
   },
+
+#' @section Methods:
+#'
+#' ## `$fit()`
+#' Fit a torch_lnm model using a custom loss function supplied to the torch_lnm module.
+#' The custom loss function has to have 2 input parameters, the model covariance matrix and 
+#' the model it is fitting to. (See Example Code for clarification)
+#' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
+#'
+#' ### Arguments
+#' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
+#' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
+#' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
+#' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+#'
+#' ### Value
+#' Self, i.e., the `torch_lnm` object with updated parameters  
   
-  custom_fit = function(lrate = 0.05, maxit = 5000, tol = 1e-20,verbose = TRUE){
+  custom_fit = function(lrate = 0.05, maxit = 5000,verbose = TRUE, tol = 1e-20){
     if(is.null(self$custom_loss)){warning('No Custom Loss function provided!')}
-    if (verbose) cat("Fitting SEM with Adam optimizer and MVN log-likelihood loss\n")
+    if (verbose) cat("Fitting SEM with Adam optimizer and custom loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     prev_loss <- 0.0
     for (epoch in 1:maxit) {
@@ -158,12 +294,30 @@ tensor_lnm <- torch::nn_module(
     return(invisible(self))
     
   },
+#' @section Methods:
+#'
+#' ## `$get_df()`
+#' Get the number of degrees of freedom in the model which equals n(n+1)/2 - number of free parameters.
+#' where n is the dimension of the sample covariance matrix.
+#'
+#' ### Value
+#' Degrees of freedom
   
   get_df=function(){
     self$df <- self$n*(self$n+1)/2 - sum(self$params_free_sizes)
+    if (self$df < 0) warning('Over identified model!')
     return(self$df)
   }
   ,
+#' @section Methods:
+#'
+#' ## `$get_all_latent_pairings()`
+#' Get all the possible combinations of latent pairs, or the pairs of latent variables as prescribed
+#' in the model. For example, if there are 3 latent variables (a,b,c), we have a total of 3 choose 2, or 3
+#' latent pairs possible and the function will return c('a~b', 'a~c', 'b~c').
+#'
+#' ### Value
+#' vector of all possible combinations of latent pairs
   get_all_latent_pairings=function(){
     self$latent_pairings <- vector(mode='character',length = factorial(self$m)/factorial(2))
     counter <- 1
@@ -175,6 +329,15 @@ tensor_lnm <- torch::nn_module(
     }
     return(self$latent_pairings)
   },
+#' @section Methods:
+#'
+#' ## `$get_loadings()`
+#' Get all the free factor loadings (entries of lambda matrix) determined after model fit. 
+#' This includes fit, custom_fit and lasso_fit. 
+#' 
+#' ### Value
+#' Dataframe of factor loadings and if the default log-likelihood fn is used in to fit,
+#' standard errors and p-values are also provided
   get_loadings=function(){
     if (is.null(self$sigma)) warning('Data must be fitted first')
     ind_idx <- vector(mode='numeric',length=self$params_free_sizes[1])
@@ -220,15 +383,21 @@ tensor_lnm <- torch::nn_module(
     rownames(self$loadings) <- loading_names
     return(self$loadings)
   },
-  find_correct_indices = function(reference_array, input_array) {
-    
-    return(which(reference_array %in% input_array))
-  },
+
+#' @section Methods:
+#'
+#' ## `$get_residuals()`
+#' Get all the free residuals (diagonal entries of theta matrix) determined after model fit. 
+#' This includes fit, custom_fit and lasso_fit. 
+#'
+#' ### Value
+#' Dataframe of residuals and if the default log-likelihood fn is used in to fit,
+#' standard errors and p-values are also provided
   get_residuals=function(){
     
     if (is.null(self$sigma)) warning('Data must be fitted first')
     ind_idx <- which(as_array(self$params_free$reshape(-1))[(self$params_sizes[1] + 1):sum(self$params_sizes[1:2])] == TRUE)
-    ind_idx <- self$find_correct_indices(diagonal_idx(self$n),ind_idx)
+    ind_idx <- find_correct_indices(diagonal_idx(self$n),ind_idx)
     residual_names <- self$vars[ind_idx]
     counter <- 1
     H_ind1 <- (self$params_free_sizes[1]+1)
@@ -251,7 +420,14 @@ tensor_lnm <- torch::nn_module(
     rownames(self$residuals) <- residual_names
     return(self$residuals)
   },
-  
+#' @section Methods:
+#'
+#' ## `$lasso_update_params_removed(v,epsilon)`
+#' Update the model attribute, self$lasso_num_params_removed. This is will be done automatically if
+#' `$get_partial_correlations()` is called after `$lasso_fit()`.
+#'
+#' ### Value
+#' None 
   lasso_update_params_removed = function(v,epsilon){
     if (is.null(self$sigma)) warning('Data must be fitted first')
     if (self$lasso == FALSE) warning('Set lasso = TRUE first!')
@@ -262,7 +438,22 @@ tensor_lnm <- torch::nn_module(
     ind <- which(abs(partial_correlations) > epsilon)
     self$lasso_num_params_removed <- (self$m*(self$m +1)/2 - self$m) - length(ind) 
   },
-  
+#' @section Methods:
+#'
+#' ## `$get_partial_correlations(epsilon)`
+#' Get all the free partial correlations (entries of lower triangle of omega_psi matrix) 
+#' determined after model fit. This includes fit, custom_fit and lasso_fit. 
+#' 
+#' ### Arguments
+#' - `epsilon` (Optional) If lasso fit was used, this determines the threshold, under which
+#' a partial correlation is no longer considered a free parameter and is set to 0. Default value is
+#' 0.00001
+#'
+#' 
+#'
+#' ### Value
+#' Dataframe of partial correlations and if the default log-likelihood fn is used in to fit,
+#' standard errors and p-values are also provided 
   get_partial_correlations = function(epsilon = 0.00001){
     if (is.null(self$sigma)) warning('Data must be fitted first')
     lower_triangle_idx <- lower_triangle_idx(self$m)
@@ -310,7 +501,19 @@ tensor_lnm <- torch::nn_module(
     return(self$partial_corr)
     
   },
-  
+#' @section Methods:
+#'
+#' ## `$get_criterion_value()`
+#' 
+#' Get the criterion value of the model according to the type of criterion specified.
+#'
+#' ### Arguments
+#' - `type` (Optional) Possible Options are 'AIC', 'BIC', 'EBIC' and 'chisq'. Currently,
+#' pruning and stepup procedures are only available for 'AIC', 'BIC', and 'EBIC'. Default is 'BIC.
+#' - `gamma` (Optional) Value of gamma hyperparameter is 'EBIC' is selected. Default value is 0.5.
+#'
+#' ### Value
+#' torch_tensor of value which represents the criterion value
   get_criterion_value = function(criterion,gamma = 0.5){
     if (criterion == "AIC") return(2*(sum(self$params_free)-self$lasso_num_params_removed) - 2*self$loglik())
     else if (criterion == "BIC") return((sum(self$params_free)-self$lasso_num_params_removed) *log(self$num_obs) - 2*self$loglik())
