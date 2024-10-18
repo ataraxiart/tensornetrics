@@ -307,7 +307,6 @@ lnm_constraint_matrices <- function(type = "lambda",lambda = NULL,n_rows, n_cols
 #' @return list containing params_start, params_free, params_value, params_sizes, params_free_sizes,
 #' params_free_sizes_max, params_free_starting_pts, lambda_matrix_Free
 #'
-#' @importFrom lav_matrix_vec, lav_matrix_vech
 lnm_mod_to_torch_opts <- function(lambda,
                                   lambda_constraint_lst = NULL,
                                   theta_constraint_lst = NULL,
