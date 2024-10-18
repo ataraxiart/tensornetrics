@@ -4,7 +4,7 @@ library(pracma)
 
 
 
-### Warning: This is Beta Code! There are potentially a lot of errors!
+### Warning: This is Beta Code! 
 
 
 
