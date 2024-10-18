@@ -440,6 +440,29 @@ extract_non_zero_entries <- function(mat) {
 }
 
 
+#' Returns the indices of an reference array which are found in an input array. If none are found,
+#' Null is returned
+#' 
+#' 
+#' Example: find_correct_indices(c(0,2,3),c(4,5,6,0))
+#' 
+#' Output: 1
+#'  
+#' 
+#' Explanation: The value 0 in the reference array (first array) is found in the second array and the 
+#' position of 0 in the reference array is 1. So 1 is returned.
+#'
+#'
+#' @param x reference array
+#' @param n input array
+#' 
+#' @return vector of indices denoting positions of entries in reference array found
+#' in input array
+#' 
+find_correct_indices = function(reference_array, input_array) {
+  return(which(reference_array %in% input_array))
+}
+
 
 #' Torch lnm module created during pruning/stepping up 
 #'
