@@ -1,4 +1,6 @@
+Package: tensornetrics
 Title: A Package for Estimating Network Models Using Torch for R
+Type: Package
 Version: 0.1.0
 Author: Lee Nian En Samuel
 Maintainer: Lee Nian En Samuel <lee_nian_en_samuel@u.nus.edu>
