@@ -1,31 +1,56 @@
+
+
+devtools::install_github('ataraxiart/tensornetrics')
+library(tensornetrics)
 library(psych)
 library(psychonetrics)
-
-
+library(torch)
 
 
 #Starwars dataset
-
 data('StarWars')
+
+#Get Design Matrix for lambda
 lambda <- matrix(0, 10, 3)
 lambda[1:4,1] <- 1
 lambda[c(1,5:7),2] <- 1
 lambda[c(1,8:10),3] <- 1
 
+#Indicate names of observed and latent variables
 observedvars <- colnames(StarWars[,1:10])
 latents <- c('Prequels','Originals','Sequels')
 
+#Instantiate lnm module
 lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
+
+#Fit using standard log-likelihood fit function
 lnm$fit(verbose = T) 
-pruned_model <- lnm %>% prune()
+
+#Access partial correlations
+lnm$get_partial_correlations()
+#After calling get_partial_correlations, correlations can be accessed as lnm$partial_corr
+print(lnm$partial_corr)
+
+
+#Access factor loadings
+lnm$get_loadings()
+#After calling get_loadings, correlations can be accessed as lnm$loadings
+print(lnm$loadings)
+
+
+#Access residuals
+lnm$get_residuals()
+#After calling residuals, correlations can be accessed as lnm$loadings
+print(lnm$residuals)
+
+
+#Perform stepwise procedures, takes a while!
+pruned_model <- prune(lnm)
 stepup_model <- pruned_model %>% stepup()
 
 
 
 #bfi dataset
-
-source(file="torch_lnm_helper_functions.R")
-
 
 lambda <- matrix(0, 25, 5)
 lambda[1:5,1] <- 1

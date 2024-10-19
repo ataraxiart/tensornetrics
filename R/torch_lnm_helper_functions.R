@@ -483,8 +483,6 @@ find_correct_indices = function(reference_array, input_array) {
 #' @name torch_lnm_stepwise
 #'
 #' @seealso [df_to_tensor()]
-#'
-#' @export
 tensor_lnm_stepwise <- torch::nn_module(
   classname = "torch_network_model",
   initialize = function(params_vec){
@@ -803,6 +801,9 @@ copy_lnm_attributes <- function(mod,params_vec){
 }
 
 
+#' Prune network models
+#' 
+#' 
 #' Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
 #' during one iteration of the pruning process and returns either the best model based on criterion score
 #' after this fitting process or the original torch_lnm/torch_lnm_stepwise module if all new models give a
@@ -849,6 +850,8 @@ prune_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
   else {return(mod)}
 }
 
+#' Prune function for network models
+#' 
 #' Performs pruning to give the best model based on the selected criterion score
 #' At the end of each iteration, one of the partial correlations will be removed and this
 #' corresponds to the model with the better model fit based on criterion score. If the models
@@ -932,6 +935,8 @@ stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 }
 
 
+#' Step Up function for network models
+#' 
 #' Performs stepping up to give the best model based on the selected criterion score
 #' At the end of each iteration, one of the originally zeropartial correlations will be
 #' turned to non-zero and this corresponds to the model with the better model fit based on criterion score. 
@@ -1026,6 +1031,8 @@ flip_one_0_to_1 <- function(tensor) {
 }
 
 
+#' LASSO for network models
+#' 
 #' Performs a lasso search to find the value of hyperparameter v which correspond to the model 
 #' which gives the lowest criterion scores (AIC/BIC/EBIC). Each model is fit with a different 
 #' value of v and partial correlations which are lower than the threshold value are set to 0/
