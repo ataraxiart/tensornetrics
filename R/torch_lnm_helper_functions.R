@@ -1036,8 +1036,9 @@ flip_one_0_to_1 <- function(tensor) {
 #' Performs a lasso search to find the value of hyperparameter v which correspond to the model 
 #' which gives the lowest criterion scores (AIC/BIC/EBIC). Each model is fit with a different 
 #' value of v and partial correlations which are lower than the threshold value are set to 0/
-#' removed from the pool of free parameters before the criterion score is calculated. 
-#' 
+#' removed from the pool of free parameters before the criterion score is calculated.
+#'  
+#' @import pracma
 #' 
 #' @param mod original torch_lnm/torch_lnm_stepwise module undergoing stepping up
 #' @param criterion string indicating criterion to use - "AIC", "BIC or "EBIC"
@@ -1049,12 +1050,15 @@ flip_one_0_to_1 <- function(tensor) {
 #' 
 #' @return value of v of the model which gives the best criterion score
 #' 
+#'
 #' @name lasso_explore
+#' 
+#' 
 #' 
 #' @export
 lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,epsilon = 0.00001, gamma = 0.5){
   if (mod$lasso == FALSE) {warning('Set lasso to TRUE first!')}
-  if (is.null(v_values)) {v_values <- logspace(log10(0.01), log10(100), 30)}
+  if (is.null(v_values)) {v_values <- pracma::logspace(log10(0.01), log10(100), 30)}
   criterion_values <- vector(mode = 'numeric',length=length(v_values))
   for (i in 1:length(v_values)){
     mod$lasso_fit(v = v_values[i])
