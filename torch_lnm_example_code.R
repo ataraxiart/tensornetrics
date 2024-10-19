@@ -46,8 +46,9 @@ print(lnm$residuals)
 
 
 #Perform stepwise procedures, takes a while!
-pruned_model <- prune(lnm,criterion='BIC')
-stepup_model <- pruned_model %>% stepup(criterion = 'BIC')
+#Use tensornetrics:: to avoid clash issues with psychonetrics
+pruned_model <- tensornetrics::prune(lnm,criterion='BIC')
+stepup_model <- pruned_model %>% tensornetrics::stepup(criterion = 'BIC')
 
 #View partial correlations/loadings of stepup_model
 
@@ -104,7 +105,7 @@ lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=TRUE,lambda=lambda,vars = obs
 #Set optimal value of v where algo chooses among 30 values from 0.01 to 100 on a logscale by default
 #We set cutoff for partial correlations to be 0.01
 #Under the hood the lasso_explore function uses just 1 lnm module to search for v so information
-#about which partial correlations are set to 0 are lost with each new iteration
+#about which partial correlations are set to 0 so info abt that is lost with each new iteration
 optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.01)
 
 
