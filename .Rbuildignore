@@ -1,0 +1,15 @@
+# Ignore RStudio project files
+^.*\.Rproj$
+
+# Ignore version control files
+^\.git$
+^\.gitignore$
+
+# Ignore R history and environment files
+^\.Rhistory$
+^\.RData$
+
+# Ignore package-specific development files
+^data-raw$
+^inst/doc$              # Ignore any manual documentation files
+^README\.md$            # If not required for package
