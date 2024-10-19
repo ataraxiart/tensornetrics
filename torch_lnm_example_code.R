@@ -45,7 +45,7 @@ print(lnm$residuals)
 
 
 #Perform stepwise procedures, takes a while!
-pruned_model <- prune(lnm)
+pruned_model <- tensornetrics::prune(lnm)
 stepup_model <- pruned_model %>% stepup()
 
 

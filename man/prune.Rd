@@ -2,11 +2,7 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{prune}
 \alias{prune}
-\title{Performs pruning to give the best model based on the selected criterion score
-At the end of each iteration, one of the partial correlations will be removed and this
-corresponds to the model with the better model fit based on criterion score. If the models
-fit at the end of 1 iteration with 1 partial correlation removed each do not lead to
-a better criterion score, the model found at the end of the previous iteration is returned.}
+\title{Prune function for network models}
 \usage{
 prune(mod, criterion = "BIC", gamma = 0.5)
 }
@@ -22,6 +18,13 @@ either the original torch_lnm/torch_lnm_stepwise module or
 a torch_lnm_stepwise module with a best criterion score after pruning
 }
 \description{
+Performs pruning to give the best model based on the selected criterion score
+At the end of each iteration, one of the partial correlations will be removed and this
+corresponds to the model with the better model fit based on criterion score. If the models
+fit at the end of 1 iteration with 1 partial correlation removed each do not lead to
+a better criterion score, the model found at the end of the previous iteration is returned.
+}
+\details{
 The process terminates if the model is left with only 1 partial correlation at the end of 
 the iteration.
 }

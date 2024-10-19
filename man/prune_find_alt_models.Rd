@@ -2,11 +2,7 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{prune_find_alt_models}
 \alias{prune_find_alt_models}
-\title{Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
-during one iteration of the pruning process and returns either the best model based on criterion score
-after this fitting process or the original torch_lnm/torch_lnm_stepwise module if all new models give a
-worse model fit based on criterion score. A possible model here is a model with one of the
-originally non-zero partial correlations now being set to zero.}
+\title{Prune network models}
 \usage{
 prune_find_alt_models(mod, criterion = "BIC", gamma = 0.5)
 }

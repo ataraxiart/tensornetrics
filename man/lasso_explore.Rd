@@ -2,10 +2,7 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{lasso_explore}
 \alias{lasso_explore}
-\title{Performs a lasso search to find the value of hyperparameter v which correspond to the model 
-which gives the lowest criterion scores (AIC/BIC/EBIC). Each model is fit with a different 
-value of v and partial correlations which are lower than the threshold value are set to 0/
-removed from the pool of free parameters before the criterion score is calculated.}
+\title{LASSO for network models}
 \usage{
 lasso_explore(
   mod,

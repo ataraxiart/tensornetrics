@@ -2,11 +2,7 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{stepup}
 \alias{stepup}
-\title{Performs stepping up to give the best model based on the selected criterion score
-At the end of each iteration, one of the originally zeropartial correlations will be
-turned to non-zero and this corresponds to the model with the better model fit based on criterion score. 
-If the models fit at the end of 1 iteration with 1 partial correlation set to non-zero each 
-do not lead to a better criterion score, the model found at the end of the previous iteration is returned.}
+\title{Step Up function for network models}
 \usage{
 stepup(mod, criterion = "BIC", gamma = 0.5)
 }
@@ -22,5 +18,12 @@ either the original torch_lnm/torch_lnm_stepwise module or
 a torch_lnm_stepwise module with a best criterion score after pruning
 }
 \description{
+Performs stepping up to give the best model based on the selected criterion score
+At the end of each iteration, one of the originally zeropartial correlations will be
+turned to non-zero and this corresponds to the model with the better model fit based on criterion score. 
+If the models fit at the end of 1 iteration with 1 partial correlation set to non-zero each 
+do not lead to a better criterion score, the model found at the end of the previous iteration is returned.
+}
+\details{
 The process terminates if the model is saturated (all partial correlations are non-zero) at the end of the iteration.
 }
