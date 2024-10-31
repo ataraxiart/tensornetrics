@@ -13,3 +13,4 @@
 ^data-raw$
 ^inst/doc$              # Ignore any manual documentation files
 ^README\.md$            # If not required for package
+^\.Rproj\.user$

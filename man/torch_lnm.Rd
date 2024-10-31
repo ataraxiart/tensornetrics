@@ -20,7 +20,7 @@ tensor_lnm(
 )
 }
 \arguments{
-\item{data}{lavaan syntax for the SEM model}
+\item{data}{data for the SEM model}
 
 \item{lambda}{design matrix for factor loadings, lambda matrix}
 

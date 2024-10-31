@@ -404,6 +404,9 @@ vech_to_symmetric_zero_diag <- function(vech, n) {
   return(mat)
 }
 
+library(Rcpp)
+
+
 
 #' Given a symmetric matrix outputs a list containing 3 vectors:  The first and second vector represent the 
 #' row and column of the non-zero entries inside the lower triangle of the symmetric matrix. 
@@ -801,7 +804,7 @@ copy_lnm_attributes <- function(mod,params_vec){
 }
 
 
-#' Prune network models
+#' Step down network models
 #' 
 #' 
 #' Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
@@ -819,12 +822,12 @@ copy_lnm_attributes <- function(mod,params_vec){
 #' @return either the original torch_lnm/torch_lnm_stepwise module or 
 #' a torch_lnm_stepwise module with a better criterion score
 #' 
-prune_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
+lnm_stepdown_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
   omega_psi_ind_1 <- mod$params_free_starting_pts[3]
   omega_psi_ind_2 <- omega_psi_ind_1 + mod$params_sizes[3]
   omega_psi_free <- mod$params_free[omega_psi_ind_1:omega_psi_ind_2]
   sum_omega_psi_free = torch_sum(omega_psi_free)$item()
-  if (sum_omega_psi_free == 0) {warning('Cant prune anymore! Left with one partial correlation!')}
+  if (sum_omega_psi_free == 0) {warning('Cant stepdown anymore! Left with one partial correlation!')}
   other_params_free <- mod$params_free[1:(omega_psi_ind_1-1)]
   other_params_vec <- mod$params_vec[1:(omega_psi_ind_1-1)]
   other_models_free_params <- flip_one_1_to_0(omega_psi_free)
@@ -850,7 +853,7 @@ prune_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
   else {return(mod)}
 }
 
-#' Prune function for network models
+#' Step down function for torch_lnm/torch_lnm_stepwise module
 #' 
 #' Performs pruning to give the best model based on the selected criterion score
 #' At the end of each iteration, one of the partial correlations will be removed and this
@@ -870,20 +873,20 @@ prune_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' a torch_lnm_stepwise module with a best criterion score after pruning
 #' 
 #' 
-#' @name prune
+#' @name lnm_stepdown
 #' 
 #' 
 #' @export
-prune <- function(mod,criterion = 'BIC',gamma = 0.5){
+lnm_stepdown <- function(mod,criterion = 'BIC',gamma = 0.5){
   
   
   current_value <- mod$get_criterion_value(criterion,gamma)$item()
-  pruned_model <- prune_find_alt_models(mod,criterion,gamma)
+  stepdown_model <- lnm_stepdown_find_alt_models(mod,criterion,gamma)
   
-  if(pruned_model$get_criterion_value(criterion,gamma)$item() == current_value){
+  if(stepdown_model$get_criterion_value(criterion,gamma)$item() == current_value){
     return(mod)
   }else{
-    prune(pruned_model,criterion,gamma)
+    lnm_stepdown(stepdown_model,criterion,gamma)
     
   }
 }
@@ -903,11 +906,15 @@ prune <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' @return either the original torch_lnm/torch_lnm_stepwise module or 
 #' a torch_lnm_stepwise module with a better criterion score
 #' 
-stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
+lnm_stepup_find_alt_models<- function(mod,criterion = 'BIC',gamma = 0.5){
   omega_psi_ind_1 <- mod$params_free_starting_pts[3]
   omega_psi_ind_2 <- omega_psi_ind_1 + mod$params_sizes[3]
   omega_psi_free <- mod$params_free[omega_psi_ind_1:omega_psi_ind_2]
   sum_omega_psi_free = torch_sum(omega_psi_free)$item()
+  if ((mod$n*(mod$n+1)/2 - sum_omega_psi_free - 1) < 0) {
+  print('Model is about to be underidentified, returning the model before 
+                                                                   underidentification') 
+    return(mod)}
   if (sum_omega_psi_free == mod$params_free_sizes_max[3]) {warning('Cant stepup anymore! Saturated!')}
   other_params_free <- mod$params_free[1:(omega_psi_ind_1-1)]
   other_params_vec <- mod$params_vec[1:(omega_psi_ind_1-1)]
@@ -917,6 +924,8 @@ stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
   list_of_criterion_values <- vector("numeric", length = num_possible_models)
   models <- vector("list", length = num_possible_models)
   current_criterion_value <- mod$get_criterion_value(criterion,gamma)$item()
+  
+  
   for(i in 1:num_possible_models){
     new_params_vec <- torch_cat(list(mod$params_vec[1:(omega_psi_ind_1-1)],torch_zeros(num_omega_psi_params)),dim = 1)
     clone <- copy_lnm_attributes(mod,new_params_vec$detach())
@@ -935,7 +944,7 @@ stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 }
 
 
-#' Step Up function for network models
+#' Step Up function for torch_lnm/torch_lnm_stepwise module
 #' 
 #' Performs stepping up to give the best model based on the selected criterion score
 #' At the end of each iteration, one of the originally zeropartial correlations will be
@@ -953,17 +962,17 @@ stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' @return either the original torch_lnm/torch_lnm_stepwise module or 
 #' a torch_lnm_stepwise module with a best criterion score after pruning
 #' 
-#' @name stepup
+#' @name lnm_stepup
 #' 
 #' @export
-stepup<- function(mod,criterion = 'BIC',gamma = 0.5){
+lnm_stepup<- function(mod,criterion = 'BIC',gamma = 0.5){
   current_value <- mod$get_criterion_value(criterion,gamma)$item()
-  stepup_model <- stepup_find_alt_models(mod,criterion,gamma)
+  stepup_model <- lnm_stepup_find_alt_models(mod,criterion,gamma)
   
   if(stepup_model$get_criterion_value(criterion,gamma)$item() == current_value){
     return(mod)
   }else{
-    stepup(stepup_model,criterion)
+    lnm_stepup(stepup_model,criterion)
     
   }
 }
@@ -1051,12 +1060,12 @@ flip_one_0_to_1 <- function(tensor) {
 #' @return value of v of the model which gives the best criterion score
 #' 
 #'
-#' @name lasso_explore
+#' @name lnm_lasso_explore
 #' 
 #' 
 #' 
 #' @export
-lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,epsilon = 0.00001, gamma = 0.5){
+lnm_lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,epsilon = 0.00001, gamma = 0.5){
   if (mod$lasso == FALSE) {warning('Set lasso to TRUE first!')}
   if (is.null(v_values)) {v_values <- pracma::logspace(log10(0.01), log10(100), 30)}
   criterion_values <- vector(mode = 'numeric',length=length(v_values))

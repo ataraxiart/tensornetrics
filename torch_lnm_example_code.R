@@ -1,7 +1,6 @@
 
 
 
-devtools::install_github('ataraxiart/tensornetrics')
 library(tensornetrics)
 library(psych)
 library(psychonetrics)
@@ -47,8 +46,8 @@ print(lnm$residuals)
 
 #Perform stepwise procedures, takes a while!
 #Use tensornetrics:: to avoid clash issues with psychonetrics
-pruned_model <- tensornetrics::prune(lnm,criterion='BIC')
-stepup_model <- pruned_model %>% tensornetrics::stepup(criterion = 'BIC')
+stepdown_model <- lnm_stepdown(lnm,criterion='BIC')
+stepup_model <- stepdown_model %>% lnm_stepup(criterion = 'BIC')
 
 #View partial correlations/loadings of stepup_model
 
@@ -104,9 +103,9 @@ lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=TRUE,lambda=lambda,vars = obs
 
 #Set optimal value of v where algo chooses among 30 values from 0.01 to 100 on a logscale by default
 #We set cutoff for partial correlations to be 0.01
-#Under the hood the lasso_explore function uses just 1 lnm module to search for v so information
+#Under the hood the lnm_lasso_explore function uses just 1 lnm module to search for v so information
 #about which partial correlations are set to 0 so info abt that is lost with each new iteration
-optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.01)
+optimal_value_of_v <- lnm_lasso_explore(lnm_lasso,epsilon = 0.01)
 
 
 #Refit lasso model to get the constraints (partial correlations now set to 0) 

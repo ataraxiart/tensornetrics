@@ -2,11 +2,15 @@
 ### Warning: This is Beta Code! 
 
 
+
+
+
+
 #' Latent Network Model with a Torch backend
 #'
 #' Function for creating a Latent Network Model
 #'
-#' @param data lavaan syntax for the SEM model
+#' @param data data for the SEM model
 #' @param lambda design matrix for factor loadings, lambda matrix
 #' @param vars vector containing names of observed variables
 #' @param latents vector containing names of latent variables
