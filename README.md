@@ -34,6 +34,7 @@ lnm <- tensor_lnm(data=StarWars[1:10], lasso=FALSE, lambda=lambda, vars=observed
 
 # Fit the model
 lnm$fit(verbose=TRUE)
+```
 
 ## More Examples
 
