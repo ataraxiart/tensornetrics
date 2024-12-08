@@ -30,8 +30,15 @@ observedvars <- colnames(StarWars[,1:10])
 latents <- c('Prequels','Originals','Sequels')
 
 # Estimate the latent network model using Torch
-lnm <- tensor_lnm(data=StarWars[1:10], lasso=FALSE, lambda=lambda, vars=observedvars, latents=latents, device=torch_device('cpu'))
+lnm <- tensor_lnm(data=StarWars[1:10], lasso=FALSE, lambda=lambda, vars=observedvars, latents=latents, device=torch_device('cpu'),identification = 'variance')
 
 # Fit the model
 lnm$fit(verbose=TRUE)
+```
+
+## More Examples
+
+For more examples, one can take a look at the files `torch_lnm_example_code.R` and `torch_rnm_example_code.R` for more details. Both files have been annotated
+to explain the what and how behind the fitting of both models. 
+
 
