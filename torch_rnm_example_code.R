@@ -1,14 +1,19 @@
+remotes::install_github("ataraxiart/tensornetrics")
+
+
 library(psychonetrics)
-library(dplyr)
-library(qgraph)
 library(psych)
+library(tensornetrics)
+library(dplyr)
 
 #RNM on self-esteem dataset
 
 lambda <- matrix(0,10,2)
 lambda[c(1,2,4,6,7),1] <- 1 # Positive items
 lambda[c(3,5,8,9,10),2] <- 1 # Negative items
-data <- read.delim("C:/Users/samue/Documents/Masters/Sem 1/Sacha Work/R codes/selfEsteem.txt",sep='\t',header=TRUE)
+file_path <- system.file( "selfEsteem.txt", package = "tensornetrics")
+data <- read.table(file_path,header =TRUE)
+
 vars <- paste0("Q",1:10)
 trainData <- data[c(TRUE,FALSE),]
 testData <- data[c(FALSE,TRUE),]
@@ -63,7 +68,7 @@ model_selected_by_lasso$fit(verbose = TRUE)
 model_selected_by_lasso$get_partial_correlations()
 
 #We can remove the insignificant partial correlations via the prune function
-final_model <- prune(model_selected_by_lasso)
+final_model <- tensornetrics::prune(model_selected_by_lasso)
 final_model$get_partial_correlations()
 
 #Get final model criterion value and fit metrics
@@ -89,10 +94,12 @@ model_on_test$get_fit_metrics() #fits v well
 #The best model returned here is still underidentified so the penalty parameters to consider
 #should be increased even more
 #Theoretically, since the objective function is convex, the solution returned by lasso
-#each time is unique
+#each time is unique but the number of params estimated to be below the threshold might be
+#insufficient
 rnm_insufficient_df <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
                   lasso=TRUE,identification = 'loadings')
-optimal_value_of_v_insufficient <- lasso_explore(rnm_insufficient_df,epsilon = 0.0001,v_values = pracma::logspace(log10(100), log10(10000), 30))
+optimal_value_of_v_insufficient <- 
+  lasso_explore(rnm_insufficient_df,epsilon = 0.0001,v_values = pracma::logspace(log10(0.01), log10(100), 30))
 
 
 
@@ -103,7 +110,7 @@ optimal_value_of_v_insufficient <- lasso_explore(rnm_insufficient_df,epsilon = 0
 #and alternate values of the penalty value v should be considered again
 rnm_heywood <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
                   lasso=TRUE,identification = 'loadings')
-optimal_value_of_v_heywood <- lasso_explore(rnm_heywood ,epsilon = 0.0001,v_values = pracma::logspace(log10(8000), log10(10000), 10))
+optimal_value_of_v_heywood <- lasso_explore(rnm_heywood ,epsilon = 0.0001,v_values = pracma::logspace(log10(100), log10(10000), 30))
 rnm_heywood  <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
                   lasso=FALSE,identification = 'loadings',omega_theta_free_lst = optimal_value_of_v_heywood[[2]])
 rnm_heywood$fit(verbose=T)
@@ -124,22 +131,23 @@ vars <- c(paste0("E",seq(1,5)),paste0("N",seq(1,5)))
 
 # RNM model:
 
+#Whenever we run lasso, we must set lasso to true: 
 rnm <- tensor_rnm(data=data%>%na.omit(),lambda,vars=vars,latents=latents,
                   lasso=TRUE,identification = 'loadings')
 
 selected_v_params <- lasso_explore(rnm,epsilon=0.0001,lrate = 0.01,
-                                       v_values=pracma::logspace(log10(100), log10(100000), 30))
+                                       v_values=pracma::logspace(log10(1000), log10(100000), 30))
 
 model_selected_by_lasso<- tensor_rnm(data=data%>%na.omit(),lambda,vars=vars,latents=latents,
                                      lasso=FALSE,identification = 'loadings',
                                      omega_theta_free_lst = selected_v_params[[2]] )
 
 #Fit model chosen by lasso
-model_selected_by_lasso$fit()
+model_selected_by_lasso$fit(verbose = FALSE)
 model_selected_by_lasso$get_partial_correlations()
 
 #Prune to remove insignificant partial correlations
-final_model <- rnm_prune(model_selected_by_lasso)
+final_model <- tensornetrics::prune(model_selected_by_lasso)
 final_model$get_partial_correlations()
 
 
