@@ -67,6 +67,12 @@ model_selected_by_lasso$fit(verbose = TRUE)
 #partial correlations of new model
 model_selected_by_lasso$get_partial_correlations()
 
+#other things you can get
+model_selected_by_lasso$get_loadings()
+model_selected_by_lasso$get_psi()
+
+
+
 #We can remove the insignificant partial correlations via the prune function
 final_model <- tensornetrics::prune(model_selected_by_lasso)
 final_model$get_partial_correlations()

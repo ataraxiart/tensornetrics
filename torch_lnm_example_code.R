@@ -1,11 +1,12 @@
 
 
+remotes::install_github("ataraxiart/tensornetrics")
 
 library(psych)
 library(psychonetrics)
 library(torch)
-
-
+library(tensornetrics)
+library(dplyr)
 
 #Starwars dataset
 data('StarWars')
@@ -140,6 +141,6 @@ lnm$get_criterion_value('BIC')$item()
 lnm_lasso$get_criterion_value('BIC')$item()
 
 #comparing fit metrics of models like CFI, TLI and RMSEA:
-lnm$get_fit_metrics()
-lnm_lasso$get_fit_metrics()
+lnm$get_fit_metrics() #model obtained after pruning
+lnm_lasso$get_fit_metrics() #model obtained after lasso
 
