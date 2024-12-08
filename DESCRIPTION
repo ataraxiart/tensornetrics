@@ -1,7 +1,7 @@
 Package: tensornetrics
 Title: A Package for Estimating Network Models Using Torch for R
 Type: Package
-Version: 0.1.0
+Version: 0.1.1
 Author: Lee Nian En Samuel
 Maintainer: Lee Nian En Samuel <lee_nian_en_samuel@u.nus.edu>
 Description: Implements algorithms using Torch for R for estimating latent, residual network models and hopefully more to come.
@@ -11,14 +11,15 @@ LazyData: true
 Imports: 
     torch,
     lavaan,
-    pracma
+    pracma,
+    stringr
 Depends: 
     R (>= 4.4.1)
 Suggests: 
     rmarkdown,
     knitr,
-    ggplot2,
-    psychonetrics
+    psychonetrics,
+    qgraph
 VignetteBuilder: knitr
 RoxygenNote: 7.3.2
 
