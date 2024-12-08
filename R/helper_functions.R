@@ -665,8 +665,8 @@ lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,lrate = 0.01,
 #'
 #' @export
 format_omega_theta <- function(mat){
-  if (!inherits(input_matrix,'torch_tensor')) {
-    input_matrix <- torch_tensor(input_matrix)
+  if (!inherits(mat,'torch_tensor')) {
+    input_matrix <- torch_tensor(mat)
   }
   lower_triangle <- mat*torch_tril(torch_ones_like(mat))
   non_zero_indices <- torch_nonzero(lower_triangle)
