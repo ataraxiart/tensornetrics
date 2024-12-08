@@ -4,7 +4,7 @@
 \alias{copy_lnm_attributes}
 \title{Given a torch_lnm module, mod, with params_vec, this copies all the attributes of mod 
 into a new torch_lnm_stepwise module (except for params_free and params_free_sizes) which 
-is instantiated during pruning/stepping up.}
+is instantiated during  stepping up/stepping down/pruning.}
 \usage{
 copy_lnm_attributes(mod, params_vec)
 }
@@ -12,7 +12,7 @@ copy_lnm_attributes(mod, params_vec)
 \item{params_vec}{params_vec which belongs to the torch_lnm module. If name of module is mod,
 "mod$params_vec" should be input here.}
 
-\item{torch_lnm}{torch_lnm module which is undergoing pruning/stepping up}
+\item{torch_lnm}{torch_lnm module which is undergoing s stepping up/stepping down/pruning}
 }
 \value{
 torch_lnm_stepwise module with the exact same attributes as the original torch_lnm module
@@ -20,5 +20,5 @@ torch_lnm_stepwise module with the exact same attributes as the original torch_l
 \description{
 Given a torch_lnm module, mod, with params_vec, this copies all the attributes of mod 
 into a new torch_lnm_stepwise module (except for params_free and params_free_sizes) which 
-is instantiated during pruning/stepping up.
+is instantiated during  stepping up/stepping down/pruning.
 }

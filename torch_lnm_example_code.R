@@ -1,10 +1,9 @@
 
-
-
 library(tensornetrics)
 library(psych)
 library(psychonetrics)
 library(torch)
+
 
 
 #Starwars dataset
@@ -20,8 +19,16 @@ lambda[c(1,8:10),3] <- 1
 observedvars <- colnames(StarWars[,1:10])
 latents <- c('Prequels','Originals','Sequels')
 
-#Instantiate lnm module
-lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
+#Instantiate lnm module 
+#variance of latents set to 1
+lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                   identification = "variance")
+
+#Or alternatively identify via loadings, default is via variance
+#first factor loading of each latent variable is set to 1
+lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                   identification = "loadings")
+
 
 #Fit using standard log-likelihood fit function
 lnm$fit(verbose = T) 
@@ -46,8 +53,8 @@ print(lnm$residuals)
 
 #Perform stepwise procedures, takes a while!
 #Use tensornetrics:: to avoid clash issues with psychonetrics
-stepdown_model <- lnm_stepdown(lnm,criterion='BIC')
-stepup_model <- stepdown_model %>% lnm_stepup(criterion = 'BIC')
+stepdown_model <- stepdown(lnm,criterion='BIC')
+stepup_model <- stepdown_model %>% stepup(criterion = 'BIC')
 
 #View partial correlations/loadings of stepup_model
 
@@ -76,6 +83,10 @@ lnm <-  tensor_lnm(data=bfi%>%na.omit(),lasso=F,lambda=lambda,vars = observedvar
 lnm$fit(verbose=F)
 lnm$get_partial_correlations()
 
+#We can remove the insignificant partial correlations via the prune function
+lnm <-  prune(lnm)
+lnm$get_partial_correlations()
+
 
 # Example Code to show the use of a custom loss function
 # We define a custom loss function, LAD estimator with inputs, sigma 
@@ -88,12 +99,13 @@ lad_estimator <- function(sigma, mod){
 lnm_custom <-  tensor_lnm(data=bfi%>%na.omit(),lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
                    custom_loss = lad_estimator)
 
-lnm_custom$custom_fit(lrate = 0.005, maxit = 500) #Cut off at 500 iterations, due to oscillating behavior
-lnm_custom$custom_fit(lrate = 0.0001, maxit = 200) #Usage of smaller learning rate for convergence
-#Final value of lad_estimator loss function is about 68
+
 
 lad_estimator(lnm$sigma,lnm) #In comparison, lad_estimator loss function for when using standard fit
                             # function is about 73.461
+
+lnm_custom$custom_fit()
+lnm_custom$get_partial_correlations()
 
 
 #Using LASSO to select for pairs of latent variables to include in our network
@@ -101,34 +113,32 @@ lad_estimator(lnm$sigma,lnm) #In comparison, lad_estimator loss function for whe
 #Instantiate an lnm module but set lasso to TRUE
 lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=TRUE,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
 
-#Set optimal value of v where algo chooses among 30 values from 0.01 to 100 on a logscale by default
-#We set cutoff for partial correlations to be 0.01
-#Under the hood the lnm_lasso_explore function uses just 1 lnm module to search for v so information
-#about which partial correlations are set to 0 so info abt that is lost with each new iteration
-optimal_value_of_v <- lnm_lasso_explore(lnm_lasso,epsilon = 0.01)
+#We use lasso_explore to perform lasso
+#By default algo chooses among 30 values from 0.01 to 100 on a logscale 
+#We set cutoff for partial correlations to be 0.0001
+optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.0001,v_values = pracma::logspace(log10(100), log10(10000), 30))
 
 
-#Refit lasso model to get the constraints (partial correlations now set to 0) 
-lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=T,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
-lnm_lasso$lasso_fit(v=optimal_value_of_v)
+#If the penalty values are not large enough, we might not be able to 
+#set any partial correlations to zero as shown here
+optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.0001,v_values = pracma::logspace(log10(1000), log10(10000), 30))
 
-#When lasso is set to T, the function get_partial_correlations will return a list
-# 1-Non-zero Partial Corr, 2-Num of Partial Corr removed, 3-Names of Partial Corr removed,
-# 4-Constraint List we can use to fit the new model
+#Here, we get a list containing value of v selected and the constraints for omega_psi
+print(optimal_value_of_v) 
 
-omega_psi_constraint_lst <- lnm_lasso$get_partial_correlations(epsilon = 0.01)[[4]]
-
-
-#Refit new model with the constraints 
-new_lnm <- tensor_lnm(data=bfi%>%na.omit(),lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
-                      omega_psi_constraint_lst = omega_psi_constraint_lst)
-
-new_lnm$fit(verbose = F)
+#Fit the model selected by lasso 
+lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                        omega_psi_constraint_lst = optimal_value_of_v[[2]],identification = 'variance')
+lnm_lasso$fit(verbose = T)
 
 #partial correlations of new model
-new_lnm$get_partial_correlations()
+lnm_lasso$get_partial_correlations()
 
 #comparing criterion of models:
-lnm$get_criterion_value('EBIC')
-new_lnm$get_criterion_value('EBIC')
+lnm$get_criterion_value('BIC')$item()
+lnm_lasso$get_criterion_value('BIC')$item()
+
+#comparing fit metrics of models like CFI, TLI and RMSEA:
+lnm$get_fit_metrics()
+lnm_lasso$get_fit_metrics()
 
