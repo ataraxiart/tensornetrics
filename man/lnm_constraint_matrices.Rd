@@ -11,7 +11,8 @@ lnm_constraint_matrices(
   lambda = NULL,
   n_rows,
   n_cols,
-  entries = NULL
+  entries = NULL,
+  identification = "variance"
 )
 }
 \arguments{
@@ -27,12 +28,14 @@ lnm_constraint_matrices(
 which parameters to fix. The first and second vector indicate the row and column of the 
 parameter inside the selected matrix to be fixed. The last vector contains the prescribed value
 for the parameter.}
+
+\item{identification}{(Optional) method to identify the model, either by variance or by loadings (default "variance")}
 }
 \value{
-list containing mat_value and mat_Free
+list containing mat_value and mat_free
 }
 \description{
-Example: lnm_constraint_matrices(type='omega_psi',n_rows=3,n_cols = 3, entries=list(c(2),c(1),c(0.8)))
+Example: lnm_constraint_matrices(type='omega_psi',n_rows=3,n_cols = 3, entries=list(c(2),c(1),c(0.8)),identification = 'variance')
 }
 \details{
 Output: $mat_value

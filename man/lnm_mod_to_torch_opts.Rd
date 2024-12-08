@@ -6,28 +6,35 @@
 model. The list contains: 1) params_start -  a vector of starting values for the parameters, 
 2) params_value - a vector of default values for non-free parameters and 3) params_free - a 
 vector of 1s and 0s which indicate which parameters are free. Also included are: 1)
-params_sizes - a vector which indicate the number of parameters in the lambda, omega_psi and theta
-matrices respectively, 2) params_free_sizes - a vector which indicate the number of free parameters in the lambda, omega_psi and theta
-matrices respectively, 3) params_free_sizes_max - a vector which indicate the maximum possible number of free parameters in the lambda, omega_psi and theta
-matrices respectively, 4) params_free_starting_pts - a vector which indicate the starting index of 
-each group of parameters, lambda, omega_psi and theta respectively and 5) lambda_matrix_free - a matrix
+params_sizes - a vector which indicate the number of parameters in the lambda, theta, delta_psi and
+omega_psi matrices respectively, 2) params_free_sizes - a vector which indicate the number of 
+free parameters in each of the four matrices respectively, 3) params_free_sizes_max - a vector 
+which indicate the maximum possible number of free parameters in the 
+four matrices, 4) params_free_starting_pts - a vector which indicate the starting index of 
+each group of parameters and 5) lambda_matrix_free - a matrix
 of 1s and 0s which indicate which parameters in the lambda matrix are free.}
 \usage{
 lnm_mod_to_torch_opts(
   lambda,
   lambda_constraint_lst = NULL,
   theta_constraint_lst = NULL,
-  omega_psi_constraint_lst = NULL
+  delta_psi_constraint_lst = NULL,
+  omega_psi_constraint_lst = NULL,
+  identification = "variance"
 )
 }
 \arguments{
 \item{lambda}{Design matrix for the factor loadings, the lambda matric}
 
-\item{lambda_constraint_lst}{(Optional) list containing 3 vectors - the row, column indices and values of the fixed parameters}
+\item{lambda_constraint_lst}{(optional)  list containing 3 vectors - the row, column indices and values of the fixed parameters}
 
-\item{theta_constraint_lst}{(Optional) list containing 3 vectors - the row, column indices and values of the fixed parameters}
+\item{theta_constraint_lst}{(optional)  list containing 3 vectors - the row, column indices and values of the fixed parameters}
 
-\item{omega_psi_constraint_lst}{(Optional) list containing 3 vectors - the row, column indices and values of the fixed parameters}
+\item{delta_psi_constraint_lst}{(optional)  list containing 3 vectors - the row, column indices and values of the fixed parameters}
+
+\item{omega_psi_constraint_lst}{(optional) list containing 3 vectors - the row, column indices and values of the fixed parameters}
+
+\item{identification}{(optional) method to identify the model, either by variance or by loadings (default "variance")}
 }
 \value{
 list containing params_start, params_free, params_value, params_sizes, params_free_sizes,

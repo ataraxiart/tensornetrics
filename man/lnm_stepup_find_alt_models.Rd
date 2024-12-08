@@ -2,7 +2,7 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{lnm_stepup_find_alt_models}
 \alias{lnm_stepup_find_alt_models}
-\title{Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
+\title{Helper function for lnm_stepup. Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
 during one iteration of the stepping up process and returns either the best model based on criterion score
 after this fitting process or the original torch_lnm/torch_lnm_stepwise module if all new models give a
 worse model fit based on criterion score. A possible model here is a model with one of the
@@ -22,7 +22,7 @@ either the original torch_lnm/torch_lnm_stepwise module or
 a torch_lnm_stepwise module with a better criterion score
 }
 \description{
-Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
+Helper function for lnm_stepup. Given an original torch_lnm/torch_lnm_stepwise module, the function fits all possible models
 during one iteration of the stepping up process and returns either the best model based on criterion score
 after this fitting process or the original torch_lnm/torch_lnm_stepwise module if all new models give a
 worse model fit based on criterion score. A possible model here is a model with one of the

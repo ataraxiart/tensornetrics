@@ -15,12 +15,13 @@ lnm_stepup(mod, criterion = "BIC", gamma = 0.5)
 }
 \value{
 either the original torch_lnm/torch_lnm_stepwise module or 
-a torch_lnm_stepwise module with a best criterion score after pruning
+a torch_lnm_stepwise module with a best criterion score after stepping down
 }
 \description{
 Performs stepping up to give the best model based on the selected criterion score
-At the end of each iteration, one of the originally zeropartial correlations will be
-turned to non-zero and this corresponds to the model with the better model fit based on criterion score. 
+At the end of each iteration, one of the originally zero partial correlations will be
+turned to non-zero and this corresponds to the model with the best model fit based on criterion score
+out of all possibilities (number of zero partial correlations at the start). 
 If the models fit at the end of 1 iteration with 1 partial correlation set to non-zero each 
 do not lead to a better criterion score, the model found at the end of the previous iteration is returned.
 }

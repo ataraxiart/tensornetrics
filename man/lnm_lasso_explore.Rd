@@ -2,32 +2,39 @@
 % Please edit documentation in R/torch_lnm_helper_functions.R
 \name{lnm_lasso_explore}
 \alias{lnm_lasso_explore}
-\title{LASSO for network models}
+\title{LASSO for LNM}
 \usage{
 lnm_lasso_explore(
   mod,
   criterion = "BIC",
-  v_values = NULL,
-  epsilon = 1e-05,
+  v_values = pracma::logspace(log10(0.01), log10(100), 30),
+  lrate = 0.01,
+  epsilon = 1e-04,
   gamma = 0.5
 )
 }
 \arguments{
 \item{mod}{original torch_lnm/torch_lnm_stepwise module undergoing stepping up}
 
-\item{criterion}{(Optional) values of the hyperparameter v to be used in the search. Default range 
+\item{criterion}{(Optional) string indicating criterion to use - "AIC", "BIC or "EBIC". Default is BIC.}
+
+\item{v_values}{(Optional) values of the hyperparameter v to be used in the search. Default range 
 of values is 30 values of v from 0.01 to 100 spread out on a log scale.}
 
-\item{epsilon}{threshold under which partial correlations will be set to 0}
+\item{lrate}{(Optional) learning rate for lasso. Default value is 0.01.}
+
+\item{epsilon}{(Optional) threshold under which partial correlations will be set to 0. Default is 0.0001.}
 
 \item{gamma}{(Optional) value of gamma if "EBIC" is used. Default value is 0.5.}
 }
 \value{
-value of v of the model which gives the best criterion score
+a list containing the following: 1)value of v of the model which 
+gives the best criterion score and 2)Constraints for omega_psi
 }
 \description{
 Performs a lasso search to find the value of hyperparameter v which correspond to the model 
-which gives the lowest criterion scores (AIC/BIC/EBIC). Each model is fit with a different 
-value of v and partial correlations which are lower than the threshold value are set to 0/
-removed from the pool of free parameters before the criterion score is calculated.
+which gives the lowest criterion scores (AIC/BIC/EBIC). At the end, the constraints
+for omega_psi (parameters which have been set to zero) will also be returned. Each model 
+is fit with a different value of v and partial correlations which are lower than the threshold value are set to 0.
+These partial correlations are removed from the pool of free parameters before the criterion score is calculated.
 }
