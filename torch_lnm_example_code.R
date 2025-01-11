@@ -7,6 +7,7 @@ library(psychonetrics)
 library(torch)
 library(tensornetrics)
 library(dplyr)
+library(qgraph)
 
 #Starwars dataset
 data('StarWars')
@@ -88,6 +89,15 @@ lnm$get_partial_correlations()
 #We can remove the insignificant partial correlations via the prune function
 lnm <-  prune(lnm)
 lnm$get_partial_correlations()
+
+qgraph(lnm$omega_psi,layout="circle",
+       title="Big 5 Personality Traits", 
+       theme = "colorblind",
+       labels = latents, 
+       vsize = 20,
+       color = "gray",
+       mar = rep(6,4))
+box("figure")
 
 
 # Example Code to show the use of a custom loss function
