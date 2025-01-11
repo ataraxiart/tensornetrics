@@ -450,11 +450,6 @@ format_lambda_mat <- function(mat,type = NULL){
 }
 
 
-lambda <- matrix(0,10,2)
-lambda[c(1,2,4,6,7),1] <- 1 
-lambda[c(3,5,8,9,10),2] <- 1 
-format_lambda_mat(lambda,type = "free")
-format_lambda_mat(lambda,type = "value")
 
 
 #' Checks if the given matrix is positive definite
