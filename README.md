@@ -1,7 +1,7 @@
 # Tensornetrics
 ## Network Models with Torch for R
 
-This R package implements algorithms using **Torch for R** to estimate network models. Currently, the package supports:
+This R package implements algorithms using **Torch for R** to estimate psychometric network models. Currently, the package supports:
 
 - **Latent network models**
 - **Residual network models**
