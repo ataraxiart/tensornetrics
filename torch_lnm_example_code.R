@@ -36,6 +36,7 @@ lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars
 #Fit using standard log-likelihood fit function
 lnm$fit(verbose = T) 
 
+
 #Access partial correlations
 lnm$get_partial_correlations()
 #After calling get_partial_correlations, correlations can be accessed as lnm$partial_corr
@@ -65,8 +66,10 @@ stepup_model$get_partial_correlations()
 stepup_model$get_loadings()
 
 #Get criterion of model:
-lnm$get_criterion_value('EBIC',gamma=0)
+lnm$get_criterion_value('BIC',gamma=0)
 stepup_model$get_criterion_value('EBIC',gamma=0)
+
+lnm$get_fit_metrics()
 
 #############################################################################
 
