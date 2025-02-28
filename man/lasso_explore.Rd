@@ -10,7 +10,8 @@ lasso_explore(
   v_values = NULL,
   lrate = 0.01,
   epsilon = 1e-04,
-  gamma = 0.5
+  gamma = 0.5,
+  batch_size = NULL
 )
 }
 \arguments{

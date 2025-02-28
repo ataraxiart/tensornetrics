@@ -4,7 +4,7 @@
 \alias{stepdown}
 \title{Step Down function for Network Models}
 \usage{
-stepdown(mod, criterion = "BIC", gamma = 0.5)
+stepdown(mod, criterion = "BIC", gamma = 0.5, batch_size = NULL)
 }
 \arguments{
 \item{mod}{torch module}

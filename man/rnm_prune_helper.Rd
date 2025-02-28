@@ -6,7 +6,7 @@
 found to be insignificant from the model and refits the model without these partial correlations.
 Thereafter, it returns the updated model.}
 \usage{
-rnm_prune_helper(mod)
+rnm_prune_helper(mod, batch_size = NULL)
 }
 \arguments{
 \item{mod}{original torch_rnm/torch_rnm_stepwise module}

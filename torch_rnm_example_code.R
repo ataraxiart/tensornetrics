@@ -3,7 +3,7 @@ remotes::install_github("ataraxiart/tensornetrics")
 
 library(psychonetrics)
 library(psych)
-library(tensornetrics)
+#library(tensornetrics)
 library(dplyr)
 
 #RNM on self-esteem dataset
@@ -142,14 +142,14 @@ rnm <- tensor_rnm(data=data%>%na.omit(),lambda,vars=vars,latents=latents,
                   lasso=TRUE,identification = 'loadings')
 
 selected_v_params <- lasso_explore(rnm,epsilon=0.0001,lrate = 0.01,
-                                       v_values=pracma::logspace(log10(1000), log10(100000), 30))
+                                       v_values=pracma::logspace(log10(1000), log10(100000), 5))
 
 model_selected_by_lasso<- tensor_rnm(data=data%>%na.omit(),lambda,vars=vars,latents=latents,
                                      lasso=FALSE,identification = 'loadings',
                                      omega_theta_free_lst = selected_v_params[[2]] )
 
 #Fit model chosen by lasso
-model_selected_by_lasso$fit(verbose = FALSE)
+model_selected_by_lasso$fit(verbose = TRUE)
 model_selected_by_lasso$get_partial_correlations()
 
 #Prune to remove insignificant partial correlations

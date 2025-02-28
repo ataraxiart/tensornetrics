@@ -4,7 +4,7 @@
 \alias{rnm_stepdown}
 \title{NOT RECOMMENDED FOR RNM DUE TO LONG EXECUTION TIMES}
 \usage{
-rnm_stepdown(mod, criterion = "BIC", gamma = 0.5)
+rnm_stepdown(mod, criterion = "BIC", gamma = 0.5, batch_size = NULL)
 }
 \arguments{
 \item{mod}{original torch_rnm/torch_rnm_stepwise module undergoing stepping up}

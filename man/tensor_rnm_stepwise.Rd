@@ -74,32 +74,37 @@ This function uses the Adam optimizer to estimate the parameters of a torch_rnm
 - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
 - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
 - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+- `batch_size` (Optional) change the number of samples used for training 
+to reduce computational time. Default is NULL
 
 ### Value
 Self, i.e., the `torch_rnm` object with updated parameters
 
 
 
-## `$fit()`
+## `$lasso_fit()`
 Fit a torch_lnm model using the lasso loss function.
 This function uses the Adam optimizer to estimate the parameters of a torch_lnm
 
 ### Arguments
+- `verbose`(Optional) whether to print progress to the console.  Default is TRUE.
 - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
 - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
 - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
 - `v` (Optional) hyperparameter which controls for the penalty term inside the lasso loss function. Default is 1.
 - `epsilon` (Optional) Cutoff for lasso to set parameter to 0. Default is 0.0001.
+- `batch_size` (Optional) change the number of samples used for training 
+to reduce computational time. Default is NULL
 
 ### Value
-Self, i.e., the `torch_lnm` object with updated parameters
+Self, i.e., the `torch_rnm` object with updated parameters
 
 
 
-## `$fit()`
+## `$custom_fit()`
 Fit a torch_lnm model using a custom loss function supplied to the torch_lnm module.
 The custom loss function has to have 2 input parameters, the model covariance matrix and 
-the model it is fitting to. (See Example Code for clarification)
+the data. (See Example Code for clarification)
 This function uses the Adam optimizer to estimate the parameters of a torch_lnm
 
 ### Arguments
@@ -107,9 +112,11 @@ This function uses the Adam optimizer to estimate the parameters of a torch_lnm
 - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
 - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
 - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+- `batch_size` (Optional) change the number of samples used for training 
+to reduce computational time. Default is NULL
 
 ### Value
-Self, i.e., the `torch_lnm` object with updated parameters
+Self, i.e., the `torch_rnm` object with updated parameters
 
 
 

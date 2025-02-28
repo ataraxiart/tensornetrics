@@ -4,7 +4,7 @@
 \alias{stepup}
 \title{Step Up function for Network Models}
 \usage{
-stepup(mod, criterion = "BIC", gamma = 0.5)
+stepup(mod, criterion = "BIC", gamma = 0.5, batch_size = NULL)
 }
 \arguments{
 \item{mod}{torch module}

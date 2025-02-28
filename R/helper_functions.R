@@ -527,13 +527,13 @@ get_alternative_update <- function(current_params, scale_factor = 0.9) {
 #'
 #'
 #' @export
-stepup <- function(mod,criterion = "BIC", gamma = 0.5){
+stepup <- function(mod,criterion = "BIC", gamma = 0.5,batch_size = NULL){
   type <- mod$model_type
   if (type == "lnm"){
-    lnm_stepup(mod,criterion,gamma)
+    lnm_stepup(mod,criterion,gamma,batch_size = batch_size)
   } 
   else if (type == "rnm"){
-    rnm_stepup(mod,criterion,gamma)
+    rnm_stepup(mod,criterion,gamma,batch_size = batch_size)
   } 
 }
 
@@ -565,13 +565,13 @@ stepup <- function(mod,criterion = "BIC", gamma = 0.5){
 #'
 #'
 #' @export
-stepdown <- function(mod,criterion = "BIC", gamma = 0.5){
+stepdown <- function(mod,criterion = "BIC", gamma = 0.5,batch_size = NULL){
     type <- mod$model_type
     if (type == "lnm"){
-      lnm_stepdown(mod,criterion,gamma)
+      lnm_stepdown(mod,criterion,gamma,batch_size=batch_size)
     } 
     else if (type == "rnm"){
-      rnm_stepdown(mod,criterion,gamma)
+      rnm_stepdown(mod,criterion,gamma,batch_size=batch_size)
     } 
   }
   
@@ -594,13 +594,13 @@ stepdown <- function(mod,criterion = "BIC", gamma = 0.5){
 #'
 #'
 #' @export
-prune <- function(mod){
+prune <- function(mod,batch_size = NULL){
   type <- mod$model_type
   if (type == "lnm"){
-    lnm_prune(mod)
+    lnm_prune(mod,batch_size = batch_size)
   } 
   else if (type == "rnm"){
-    rnm_prune(mod)
+    rnm_prune(mod,batch_size = batch_size)
   } 
 }
 
@@ -631,13 +631,13 @@ prune <- function(mod){
 #'
 #'
 #' @export
-lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,lrate = 0.01,epsilon = 0.0001, gamma = 0.5){
+lasso_explore <- function(mod, criterion = "BIC", v_values = NULL ,lrate = 0.01,epsilon = 0.0001, gamma = 0.5,batch_size = NULL){
     type <- mod$model_type
     if (type == "lnm"){
-      lnm_lasso_explore(mod, criterion, v_values, lrate, epsilon, gamma)
+      lnm_lasso_explore(mod, criterion, v_values, lrate, epsilon, gamma,batch_size=batch_size)
     } 
     else if (type == "rnm"){
-      rnm_lasso_explore(mod, criterion, v_values, lrate, epsilon, gamma)
+      rnm_lasso_explore(mod, criterion, v_values, lrate, epsilon, gamma,batch_size=batch_size)
     } 
   }
   

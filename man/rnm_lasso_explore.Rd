@@ -10,7 +10,8 @@ rnm_lasso_explore(
   v_values = pracma::logspace(log10(0.01), log10(100), 30),
   lrate = 0.01,
   epsilon = 1e-04,
-  gamma = 0.5
+  gamma = 0.5,
+  batch_size = batch_size
 )
 }
 \arguments{

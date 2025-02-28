@@ -4,7 +4,12 @@
 \alias{rnm_stepdown_find_alt_models}
 \title{NOT RECOMMENDED FOR RNM DUE TO LONG EXECUTION TIMES}
 \usage{
-rnm_stepdown_find_alt_models(mod, criterion = "BIC", gamma = 0.5)
+rnm_stepdown_find_alt_models(
+  mod,
+  criterion = "BIC",
+  gamma = 0.5,
+  batch_size = NULL
+)
 }
 \arguments{
 \item{mod}{original torch_rnm/torch_rnm_stepwise module undergoing stepping up}

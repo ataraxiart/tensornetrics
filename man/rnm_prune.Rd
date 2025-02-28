@@ -4,7 +4,7 @@
 \alias{rnm_prune}
 \title{Pruning function for torch_rnm/torch_rnm_stepwise module}
 \usage{
-rnm_prune(mod)
+rnm_prune(mod, batch_size = NULL)
 }
 \arguments{
 \item{mod}{original torch_rnm/torch_rnm_stepwise module}

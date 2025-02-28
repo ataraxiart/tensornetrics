@@ -15,7 +15,7 @@ copy_rnm_attributes(mod, params_vec)
 \item{torch_rnm}{torch_rnm module which is undergoing stepping down/stepping up/pruning}
 }
 \value{
-torch_enm_stepwise module with the exact same attributes as the original torch_enm module
+torch_rnm_stepwise module with the exact same attributes as the original torch_enm module
 }
 \description{
 Given a torch_rnm module, mod, with params_vec, this copies all the attributes of mod 

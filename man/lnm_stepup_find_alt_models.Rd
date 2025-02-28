@@ -8,7 +8,12 @@ after this fitting process or the original torch_lnm/torch_lnm_stepwise module i
 worse model fit based on criterion score. A possible model here is a model with one of the
 originally zero partial correlations now being set to non-zero.}
 \usage{
-lnm_stepup_find_alt_models(mod, criterion = "BIC", gamma = 0.5)
+lnm_stepup_find_alt_models(
+  mod,
+  criterion = "BIC",
+  gamma = 0.5,
+  batch_size = NULL
+)
 }
 \arguments{
 \item{mod}{original torch_lnm/torch_lnm_stepwise module undergoing stepping up}

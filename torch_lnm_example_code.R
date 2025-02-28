@@ -5,7 +5,7 @@ remotes::install_github("ataraxiart/tensornetrics")
 library(psych)
 library(psychonetrics)
 library(torch)
-library(tensornetrics)
+# library(tensornetrics)
 library(dplyr)
 library(qgraph)
 
@@ -34,7 +34,7 @@ lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars
 
 
 #Fit using standard log-likelihood fit function
-lnm$fit(verbose = T) 
+lnm$fit(verbose = T,lr=0.05) 
 
 
 #Access partial correlations
@@ -68,6 +68,7 @@ stepup_model$get_loadings()
 #Get criterion of model:
 lnm$get_criterion_value('BIC',gamma=0)
 stepup_model$get_criterion_value('EBIC',gamma=0)
+stepup_model$get_fit_metrics()
 
 lnm$get_fit_metrics()
 
@@ -86,11 +87,11 @@ latents <- c('Agreeableness','Conscientiousness','Extraversion','Neuroticism','O
 observedvars <- colnames(bfi)[1:25]
 
 lnm <-  tensor_lnm(data=bfi%>%na.omit(),lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
-lnm$fit(verbose=F)
+lnm$fit(verbose=T)
 lnm$get_partial_correlations()
 
 #We can remove the insignificant partial correlations via the prune function
-lnm <-  prune(lnm)
+lnm <- prune(lnm)
 lnm$get_partial_correlations()
 
 qgraph(lnm$omega_psi,layout="circle",
@@ -107,16 +108,24 @@ box("figure")
 # We define a custom loss function, LAD estimator with inputs, sigma 
 #(the model covariance matrix) and mod (the lnm module to access its sample covariance attribute)
 
-lad_estimator <- function(sigma, mod){
-  torch_sum(torch_abs(sigma - mod$cov_matrix))
+lad_estimator <- function(sigma, data){
+  get_cov_matrix <- function(data) {
+    data_matrix <- as_array(data)
+    if (!is.null(data_matrix )) {
+      return(cov(data_matrix , use = "pairwise.complete.obs"))  # Handles NAs if present
+    } else {
+      stop("data_matrix is NULL")
+    }
+  }
+  cov_matrix <- get_cov_matrix(data)
+  torch_sum(torch_abs(sigma - cov_matrix))
 }
 
 lnm_custom <-  tensor_lnm(data=bfi%>%na.omit(),lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
                    custom_loss = lad_estimator)
 
 
-
-lad_estimator(lnm$sigma,lnm) #In comparison, lad_estimator loss function for when using standard fit
+lad_estimator(lnm$sigma,lnm$data) #In comparison, lad_estimator loss function for when using standard fit
                             # function is about 73.461
 
 lnm_custom$custom_fit()
@@ -133,10 +142,6 @@ lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=TRUE,lambda=lambda,vars = obs
 #We set cutoff for partial correlations to be 0.0001
 optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.0001,v_values = pracma::logspace(log10(100), log10(10000), 30))
 
-
-#If the penalty values are not large enough, we might not be able to 
-#set any partial correlations to zero as shown here
-optimal_value_of_v <- lasso_explore(lnm_lasso,epsilon = 0.0001,v_values = pracma::logspace(log10(1000), log10(10000), 30))
 
 #Here, we get a list containing value of v selected and the constraints for omega_psi
 print(optimal_value_of_v) 
@@ -156,4 +161,5 @@ lnm_lasso$get_criterion_value('BIC')$item()
 #comparing fit metrics of models like CFI, TLI and RMSEA:
 lnm$get_fit_metrics() #model obtained after pruning
 lnm_lasso$get_fit_metrics() #model obtained after lasso
+
 

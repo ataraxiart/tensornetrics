@@ -4,7 +4,7 @@
 \alias{prune}
 \title{Pruning function for Network Models}
 \usage{
-prune(mod)
+prune(mod, batch_size = NULL)
 }
 \arguments{
 \item{mod}{torch module}

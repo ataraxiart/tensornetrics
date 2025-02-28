@@ -147,9 +147,12 @@ tensor_lnm <- torch::nn_module(
   #'
   #' ### Value
   #' Log-likelihood value (torch scalar)
-  loglik = function() {
-    px <- distr_multivariate_normal(loc = self$mu, covariance_matrix = self$forward())
-    return(px$log_prob(self$data)$sum())
+  loglik = function(data = NULL) {
+    if (is.null(data)){
+      data = self$data
+    }
+    px <- distr_multivariate_normal(loc = self$mu, covariance_matrix = self$forward(),validate_args=FALSE)
+    return(px$log_prob(data)$sum())
     
   },
   #' @section Methods:
@@ -162,8 +165,11 @@ tensor_lnm <- torch::nn_module(
   #'
   #' ### Value
   #' lasso loss value (torch scalar)
-  lasso_loss = function(v) {
-    return(-2*self$loglik() + v*sum(abs(self$omega_psi$t()$reshape(-1)[strict_lower_triangle_idx(self$m)])))
+  lasso_loss = function(v,data = NULL) {
+    if (is.null(data)){
+      data = self$data
+    }
+    return(-2*self$loglik(data) + v*sum(abs(self$omega_psi$t()$reshape(-1)[strict_lower_triangle_idx(self$m)])))
   }
   ,
   
@@ -188,44 +194,65 @@ tensor_lnm <- torch::nn_module(
   #' @section Methods:
   #'
   #' ## `$fit()`
-  #' Fit a torch_lnm model using the default maximum likelihood objective.
-  #' This function uses the Adam optimizer to estimate the parameters of a torch_slnm
+  #' Fit a torch_rnm model using the default maximum likelihood objective.
+  #' This function uses the Adam optimizer to estimate the parameters of a torch_rnm
   #'
   #' ### Arguments
   #' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #'
   #' ### Value
-  #' Self, i.e., the `torch_lnm` object with updated parameters  
-  fit = function(lrate = 0.05, maxit = 5000, verbose = TRUE, tol = 1e-20) {
+  #' Self, i.e., the `torch_lnm` object with updated parameters 
+  fit = function(lrate = 0.05, maxit = 5000, verbose = TRUE, tol = 1e-20, batch_size = NULL) {
     if (verbose) cat("Fitting SEM with Adam optimizer and MVN log-likelihood loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      loss <- -2*self$loglik()
-      if (verbose) {
-        cat("\rEpoch:", epoch, " loglik:", -loss$item())
-        flush.console()
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1  # Shuffle data at the start of each epoch
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end] 
+        batch_data <- self$data[batch_indices]
+        optim$zero_grad()
+        loss <- -2 * self$loglik(batch_data)
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
+          with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+          counter <- counter + 1
+          if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+          
+        }
       }
-      loss$backward()
-      optim$step()
-      counter <- 1
-      while (!is_positive_definite(self$forward()) && counter <  maxit) {
-        with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
-        counter <- counter + 1
-        if (counter > maxit) {warning("No convergence due to issues with positive definiteness")}
-      }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
+        
+      current_loss <- -2*self$loglik()$item()  
+        if (verbose) {
+          cat("\rEpoch:", epoch, " loss:", current_loss )
+          flush.console()
+        }
+      
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         if (verbose) cat("\n")
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss
       scheduler$step(prev_loss)
     }
+    
     if (epoch == maxit) warning("maximum iterations reached")
     
     return(invisible(self))
@@ -238,48 +265,75 @@ tensor_lnm <- torch::nn_module(
   #' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
   #'
   #' ### Arguments
+  #' - `verbose`(Optional) whether to print progress to the console.  Default is TRUE.
   #' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
   #' - `v` (Optional) hyperparameter which controls for the penalty term inside the lasso loss function. Default is 1.
   #' - `epsilon` (Optional) Cutoff for lasso to set parameter to 0. Default is 0.0001.
-  #' 
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #' 
   #' ### Value
-  #' Self, i.e., the `torch_lnm` object with updated parameters  
+  #' Self, i.e., the `torch_rnm` object with updated parameters    
   
-  lasso_fit = function(lrate = 0.05, maxit = 5000, tol = 1e-20,v=1,epsilon = 0.0001){
-    optim <- optim_adam(self$params_vec, lr = lrate)
+  lasso_fit = function(verbose=FALSE, lrate = 0.05, maxit = 5000, tol = 1e-20, v=1, epsilon = 0.0001, batch_size = NULL) {
+    optim <- optim_adam(self$params_vec, lr = lrate, amsgrad = TRUE)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      loss <- self$lasso_loss(v)
-      loss$backward()
-      optim$step()  
-      counter <- 1
-      while (!is_positive_definite(self$forward()) && counter <  maxit) {
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1  
+      # Shuffle data at the start of each epoch
+      
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end]
+        batch_data <- self$data[batch_indices]
+        optim$zero_grad()
+        loss <- self$lasso_loss(v, batch_data) # Compute loss on batch
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
         with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
         counter <- counter + 1
-        if (counter > maxit) {warning("No convergence due to issues with positive definiteness")}
+        if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+        
+        }
       }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
+      
+      current_loss <- self$lasso_loss(v)$item()
+      if (verbose) {
+        cat("\rEpoch:", epoch, " loss:", current_loss)
+        flush.console()
+      }
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss
       scheduler$step(prev_loss)
-    } 
-    self$lasso_update_params_removed(epsilon = epsilon)
-    if (epoch == maxit) warning("maximum iterations reached")
+    }
+    
+    self$lasso_update_params_removed(v=v, epsilon=epsilon)
+    
+    if (epoch == maxit) warning("maximum iterations reached") 
+    
     return(invisible(self))
   },
   
   #' @section Methods:
   #'
-  #' ## `$custom_fit()`
+  #' ## `$fit()`
   #' Fit a torch_lnm model using a custom loss function supplied to the torch_lnm module.
   #' The custom loss function has to have 2 input parameters, the model covariance matrix and 
-  #' the model it is fitting to. (See Example Code for clarification)
+  #' the data. (See Example Code for clarification)
   #' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
   #'
   #' ### Arguments
@@ -287,39 +341,58 @@ tensor_lnm <- torch::nn_module(
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #'
   #' ### Value
   #' Self, i.e., the `torch_lnm` object with updated parameters  
   
-  custom_fit = function(lrate = 0.1, maxit = 5000,verbose = TRUE, tol = 1e-20){
+  custom_fit = function(lrate = 0.05, maxit = 5000,verbose = TRUE, tol = 1e-20, batch_size = NULL){
     if(is.null(self$custom_loss)){warning('No Custom Loss function provided!')}
     if (verbose) cat("Fitting SEM with Adam optimizer and custom loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      self$forward()
-      loss <- self$custom_loss(self$sigma,self)
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1   
+      # Shuffle data at the start of each epoch
+      
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end]
+        batch_data <- self$data[batch_indices]
+        optim$zero_grad()
+        loss <- self$custom_loss(self$forward(), batch_data)  # Compute loss on batch
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
+          with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+          counter <- counter + 1
+          if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+          
+        }
+      } 
+      
+      current_loss <-  self$custom_loss(self$forward(), self$data)$item()
       if (verbose) {
-        cat("\rEpoch:", epoch, " Value of Loss Function:", loss$item())
+        cat("\rEpoch:", epoch, " loss:", current_loss)
         flush.console()
       }
-      loss$backward()
-      optim$step()
-      counter <- 1
-      while (!is_positive_definite(self$forward()) && counter <  maxit) {
-        with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
-        counter <- counter + 1
-        if (counter > maxit) {warning("No convergence due to issues with positive definiteness")}
-      }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
-        if (verbose) cat("\n")
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss 
       scheduler$step(prev_loss)
     }
+    
     
     if (epoch == maxit) warning("maximum iterations reached")
     return(invisible(self))
@@ -594,7 +667,10 @@ tensor_lnm <- torch::nn_module(
     self$cfi <- (1 - (chisq_model-df_model)/(chisq_baseline-df_baseline))$item()
     self$tli <- ((chisq_baseline/df_baseline - chisq_model/df_model)/(chisq_baseline/df_baseline - 1))$item()
     self$rmsea <- sqrt((chisq_model/df_model-1)/(self$num_obs - 1))$item()
-    self$rmsea_lower <- min(sqrt(((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1))),0,na.rm=TRUE)
+    if (is.nan(sqrt(qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item())))){}
+    else{
+    self$rmsea_lower <- sqrt(((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1)))
+    }
     self$rmsea_upper <- max(sqrt(((qchisq(0.95,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1))),0,na.rm=TRUE)
     self$metrics <- data.frame("Metrics" = metric_names, "Values" = c(self$cfi, self$tli,self$rmsea,self$rmsea_lower,self$rmsea_upper))
     return(self$metrics)

@@ -276,6 +276,7 @@ tensor_rnm_stepwise <- torch::nn_module(
   initialize = function(params_vec){
     self$params_vec<-nn_parameter(params_vec)
   },
+  
   #' @section Methods:
   #'
   #' ## `$forward()`
@@ -321,9 +322,12 @@ tensor_rnm_stepwise <- torch::nn_module(
   #'
   #' ### Value
   #' Log-likelihood value (torch scalar)
-  loglik = function() {
+  loglik = function(data = NULL) {
+    if (is.null(data)){
+      data = self$data
+    }
     px <- distr_multivariate_normal(loc = self$mu, covariance_matrix = self$forward(),validate_args=FALSE)
-    return(px$log_prob(self$data)$sum())
+    return(px$log_prob(data)$sum())
     
   },
   
@@ -337,8 +341,11 @@ tensor_rnm_stepwise <- torch::nn_module(
   #'
   #' ### Value
   #' lasso loss value (torch scalar)
-  lasso_loss = function(v) {
-    return(-2*self$loglik() + v*sum(abs(self$omega_theta$t()$reshape(-1)[strict_lower_triangle_idx(self$n)])))
+  lasso_loss = function(v,data = NULL) {
+    if (is.null(data)){
+      data = self$data
+    }
+    return(-2*self$loglik(data) + v*sum(abs(self$omega_theta$t()$reshape(-1)[strict_lower_triangle_idx(self$n)])))
   },
   
   #' @section Methods:
@@ -370,83 +377,139 @@ tensor_rnm_stepwise <- torch::nn_module(
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #'
   #' ### Value
   #' Self, i.e., the `torch_rnm` object with updated parameters 
-  fit = function(lrate = 0.05, maxit = 5000, verbose = TRUE, tol = 1e-20) {
+  fit = function(lrate = 0.05, maxit = 5000, verbose = TRUE, tol = 1e-20, batch_size = NULL) {
     if (verbose) cat("Fitting SEM with Adam optimizer and MVN log-likelihood loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      loss <- -2*self$loglik()
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1  # Shuffle data at the start of each epoch
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end] 
+        batch_data <- self$data[batch_indices]
+        optim$zero_grad()
+        loss <- -2 * self$loglik(batch_data)
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
+          with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+          counter <- counter + 1
+          if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+          
+        }
+      }
+      
+      current_loss <- -2*self$loglik()$item()  
       if (verbose) {
-        cat("\rEpoch:", epoch, " loglik:", -loss$item())
+        cat("\rEpoch:", epoch, " loss:", current_loss )
         flush.console()
       }
-      loss$backward()
-      optim$step()
-      while (!is_positive_definite(self$forward()) && epoch <  maxit) {
-        with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
-        
-      }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
+      
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         if (verbose) cat("\n")
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss
+      scheduler$step(prev_loss)
     }
+    
     if (epoch == maxit) warning("maximum iterations reached")
     
     return(invisible(self))
-  },
+  }
+  ,
   #' @section Methods:
   #'
-  #' ## `$fit()`
+  #' ## `$lasso_fit()`
   #' Fit a torch_lnm model using the lasso loss function.
   #' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
   #'
   #' ### Arguments
+  #' - `verbose`(Optional) whether to print progress to the console.  Default is TRUE.
   #' - `lrate` (Optional) learning rate of the Adam optimizer. Default is 0.05.
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
   #' - `v` (Optional) hyperparameter which controls for the penalty term inside the lasso loss function. Default is 1.
   #' - `epsilon` (Optional) Cutoff for lasso to set parameter to 0. Default is 0.0001.
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #' 
   #' ### Value
-  #' Self, i.e., the `torch_lnm` object with updated parameters  
+  #' Self, i.e., the `torch_rnm` object with updated parameters  
   
-  lasso_fit = function(verbose=FALSE,lrate = 0.05, maxit = 5000, tol = 1e-20,v=1,epsilon = 0.0001){
+  lasso_fit = function(verbose=FALSE, lrate = 0.05, maxit = 5000, tol = 1e-20, v=1, epsilon = 0.0001, batch_size = NULL) {
     optim <- optim_adam(self$params_vec, lr = lrate, amsgrad = TRUE)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      loss <- self$lasso_loss(v)
-      loss$backward()
-      optim$step()
-      while (!is_positive_definite(self$forward()) && epoch <  maxit) {
-        with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1  
+      # Shuffle data at the start of each epoch
+      
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end]
+        batch_data <- self$data[batch_indices]
         
+        optim$zero_grad()
+        loss <- self$lasso_loss(v, batch_data)  # Compute loss on batch
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
+          with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+          counter <- counter + 1
+          if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+          
+        }
       }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
+      
+      current_loss <- self$lasso_loss(v)$item()
+      if (verbose) {
+        cat("\rEpoch:", epoch, " loss:", current_loss)
+        flush.console()
+      }
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss
       scheduler$step(prev_loss)
     }
-    self$lasso_update_params_added(v=v,epsilon=epsilon)
-    if (epoch == maxit) warning("maximum iterations reached")
+    
+    self$lasso_update_params_added(v=v, epsilon=epsilon)
+    
+    if (epoch == maxit) warning("maximum iterations reached") 
+    
     return(invisible(self))
   },
   
   #' @section Methods:
   #'
-  #' ## `$fit()`
+  #' ## `$custom_fit()`
   #' Fit a torch_lnm model using a custom loss function supplied to the torch_lnm module.
   #' The custom loss function has to have 2 input parameters, the model covariance matrix and 
-  #' the model it is fitting to. (See Example Code for clarification)
+  #' the data. (See Example Code for clarification)
   #' This function uses the Adam optimizer to estimate the parameters of a torch_lnm
   #'
   #' ### Arguments
@@ -454,37 +517,58 @@ tensor_rnm_stepwise <- torch::nn_module(
   #' - `maxit` (Optional) maximum number of epochs to train the model. Default is 5000.
   #' - `verbose` (Optional) whether to print progress to the console.  Default is TRUE.
   #' - `tol` (Optional) parameter change tolerance for stopping training. Default is 1e-20.
+  #' - `batch_size` (Optional) change the number of samples used for training 
+  #' to reduce computational time. Default is NULL
   #'
   #' ### Value
-  #' Self, i.e., the `torch_lnm` object with updated parameters  
+  #' Self, i.e., the `torch_rnm` object with updated parameters  
   
-  custom_fit = function(lrate = 0.05, maxit = 5000,verbose = TRUE, tol = 1e-20){
+  custom_fit = function(lrate = 0.05, maxit = 5000,verbose = TRUE, tol = 1e-20, batch_size = NULL){
     if(is.null(self$custom_loss)){warning('No Custom Loss function provided!')}
     if (verbose) cat("Fitting SEM with Adam optimizer and custom loss\n")
     optim <- optim_adam(self$params_vec, lr = lrate)
     scheduler <- lr_reduce_on_plateau(optim, factor = 0.5, patience = 5)
     prev_loss <- 0.0
+    data_size <- nrow(self$data)  # Assuming self$data contains dataset
+    if (is.null(batch_size) || batch_size >= data_size) {
+      batch_size <- data_size  # Use full dataset if batch_size is NULL or too large
+    }
     for (epoch in 1:maxit) {
-      optim$zero_grad()
-      self$forward()
-      loss <- self$custom_loss(self$sigma,self)
+      permuted_indices <- as_array(torch_randperm(data_size)) + 1   
+      # Shuffle data at the start of each epoch
+      
+      num_batches <- ceiling(data_size / batch_size)
+      
+      for (batch in 1:num_batches) {
+        batch_start <- (batch - 1) * batch_size + 1
+        batch_end <- min(batch_start + batch_size - 1, data_size)
+        batch_indices <- permuted_indices[batch_start:batch_end]
+        batch_data <- self$data[batch_indices]
+        optim$zero_grad()
+        loss <- self$custom_loss(self$sigma, batch_data)  # Compute loss on batch
+        loss$backward()
+        optim$step()
+        counter <- 1
+        while (!is_positive_definite(self$forward()) && counter < maxit) {
+          with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
+          counter <- counter + 1
+          if (counter == maxit) {warning("No convergence due to issues with positive definiteness")}
+          
+        }
+      } 
+      
+      current_loss <-  self$custom_loss(self$forward(), self$data)$item()
       if (verbose) {
-        cat("\rEpoch:", epoch, " Value of Loss Function:", loss$item())
+        cat("\rEpoch:", epoch, " loss:", current_loss )
         flush.console()
       }
-      loss$backward()
-      optim$step()
-      while (!is_positive_definite(self$forward()) && epoch <  maxit) {
-        with_no_grad(self$params_vec$copy_(get_alternative_update(self$params_vec)))
-        
-      }
-      if (epoch > 1 && abs(loss$item() - prev_loss) < tol) {
-        if (verbose) cat("\n")
+      if (epoch > 1 && abs(current_loss - prev_loss) < tol) {
         break
       }
-      prev_loss <- loss$item()
+      prev_loss <- current_loss 
       scheduler$step(prev_loss)
     }
+    
     
     if (epoch == maxit) warning("maximum iterations reached")
     return(invisible(self))
@@ -844,13 +928,17 @@ tensor_rnm_stepwise <- torch::nn_module(
     self$cfi <- (1 - (chisq_model-df_model)/(chisq_baseline-df_baseline))$item()
     self$tli <- ((chisq_baseline/df_baseline - chisq_model/df_model)/(chisq_baseline/df_baseline - 1))$item()
     self$rmsea <- sqrt((chisq_model/df_model-1)/(self$num_obs - 1))$item()
-    self$rmsea_lower <- sqrt(((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1)))
-    self$rmsea_upper <- sqrt(((qchisq(0.95,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1)))
+    if (is.nan(sqrt(qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item())))){}
+    else{
+      self$rmsea_lower <- sqrt(((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1)))
+    }
+    self$rmsea_upper <- max(sqrt(((qchisq(0.95,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1))),0,na.rm=TRUE)
     self$metrics <- data.frame("Metrics" = metric_names, "Values" = c(self$cfi, self$tli,self$rmsea,self$rmsea_lower,self$rmsea_upper))
     return(self$metrics)
   }
   
 )
+
 
 
 #' Given a torch_rnm module, mod, with params_vec, this copies all the attributes of mod 
@@ -862,7 +950,7 @@ tensor_rnm_stepwise <- torch::nn_module(
 #' @param params_vec params_vec which belongs to the torch_enm module. If name of module is mod,
 #' "mod$params_vec" should be input here.
 #' 
-#' @return torch_enm_stepwise module with the exact same attributes as the original torch_enm module
+#' @return torch_rnm_stepwise module with the exact same attributes as the original torch_enm module
 #' 
 copy_rnm_attributes <- function(mod,params_vec){
   output_model <- tensor_rnm_stepwise(params_vec)
@@ -915,7 +1003,7 @@ copy_rnm_attributes <- function(mod,params_vec){
 #' @return either the original torch_rnm/torch_rnm_stepwise module or 
 #' a torch_rnm_stepwise module with a better criterion score
 #' 
-rnm_stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
+rnm_stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5,batch_size = NULL){
   omega_theta_ind_1 <- mod$params_free_starting_pts[4]
   omega_theta_ind_2 <- omega_theta_ind_1 + mod$params_sizes[4]
   omega_theta_free <- mod$params_free[omega_theta_ind_1:omega_theta_ind_2]
@@ -934,7 +1022,7 @@ rnm_stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
     clone <- copy_rnm_attributes(mod,new_params_vec$detach())
     clone$params_free <- torch_cat(list(other_params_free,other_models_free_params[[i]]),dim=1)
     clone$params_free_sizes <- c(mod$params_free_sizes[1:3], mod$params_free_sizes[4] - 1) 
-    clone$fit(verbose=F)
+    clone$fit(verbose=F,batch_size = batch_size)
     models[[i]] <- clone
     list_of_criterion_values[i] <- clone$get_criterion_value(criterion,gamma)$item()
   }
@@ -963,13 +1051,13 @@ rnm_stepup_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' a torch_rnm_stepwise module with a best criterion score after stepping down
 #' 
 #' 
-rnm_stepup<- function(mod,criterion = 'BIC',gamma = 0.5){
+rnm_stepup<- function(mod,criterion = 'BIC',gamma = 0.5, batch_size = NULL){
   current_value <- mod$get_criterion_value(criterion,gamma)$item()
-  stepup_model <- rnm_stepup_find_alt_models(mod,criterion,gamma)
+  stepup_model <- rnm_stepup_find_alt_models(mod,criterion,gamma,batch_size = batch_size)
   if(stepup_model$get_criterion_value(criterion,gamma)$item() == current_value){
     return(mod)
   }else{
-    rnm_stepup(stepup_model,criterion)
+    rnm_stepup(stepup_model,criterion,batch_size = batch_size)
     
   }
 }
@@ -991,7 +1079,7 @@ rnm_stepup<- function(mod,criterion = 'BIC',gamma = 0.5){
 #' @return either the original torch_rnm/torch_rnm_stepwise module or 
 #' a torch_rnm_stepwise module with a better criterion score
 #' 
-rnm_stepdown_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
+rnm_stepdown_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5, batch_size = NULL){
   omega_theta_ind_1 <- mod$params_free_starting_pts[4]
   omega_theta_ind_2 <- omega_theta_ind_1 + mod$params_sizes[4]
   omega_theta_free <- mod$params_free[omega_theta_ind_1:omega_theta_ind_2]
@@ -1010,7 +1098,7 @@ rnm_stepdown_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
     clone <- copy_rnm_attributes(mod,new_params_vec$detach())
     clone$params_free <- torch_cat(list(other_params_free,other_models_free_params[[i]]),dim=1)
     clone$params_free_sizes <- c(mod$params_free_sizes[1:3], mod$params_free_sizes[4] - 1) 
-    clone$fit(verbose=F)
+    clone$fit(verbose=F,batch_size = batch_size)
     models[[i]] <- clone
     list_of_criterion_values[i] <- clone$get_criterion_value(criterion,gamma)$item()
   }
@@ -1043,16 +1131,16 @@ rnm_stepdown_find_alt_models <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' 
 #' @return either the original torch_rnm/torch_rnm_stepwise module or 
 #' 
-rnm_stepdown <- function(mod,criterion = 'BIC',gamma = 0.5){
+rnm_stepdown <- function(mod,criterion = 'BIC',gamma = 0.5, batch_size = NULL){
   
   
   current_value <- mod$get_criterion_value(criterion,gamma)$item()
-  stepdown_model <- rnm_stepdown_find_alt_models(mod,criterion,gamma)
+  stepdown_model <- rnm_stepdown_find_alt_models(mod,criterion,gamma,batch_size=batch_size)
   
   if(stepdown_model$get_criterion_value(criterion,gamma)$item() == current_value){
     return(mod)
   }else{
-    rnm_stepdown(stepdown_model,criterion,gamma)
+    rnm_stepdown(stepdown_model,criterion,gamma,batch_size=batch_size)
     
   }
 }
@@ -1068,7 +1156,7 @@ rnm_stepdown <- function(mod,criterion = 'BIC',gamma = 0.5){
 #' 
 #' @return new refitted model with insignificant partial correlations removed
 #' 
-rnm_prune_helper <- function(mod){
+rnm_prune_helper <- function(mod,batch_size = NULL){
   
   index <- which(mod$partial_corr$Significant == "")
   num_params_removed <- length( index)  
@@ -1087,7 +1175,7 @@ rnm_prune_helper <- function(mod){
   clone <- copy_rnm_attributes(mod,new_params_vec$detach())
   clone$params_free <- torch_cat(list(other_params_free,new_free_params),dim=1)
   clone$params_free_sizes <- c(mod$params_free_sizes[1:3], mod$params_free_sizes[4] - num_params_removed) 
-  clone$fit(verbose=F)
+  clone$fit(verbose=F,batch_size=batch_size)
   return(clone) 
   
 }
@@ -1104,14 +1192,14 @@ rnm_prune_helper <- function(mod){
 #' 
 #' @return new refitted model with only significant partial correlations 
 #' 
-rnm_prune <- function(mod){
-  pruned_model <-  rnm_prune_helper(mod)
+rnm_prune <- function(mod,batch_size = NULL){
+  pruned_model <-  rnm_prune_helper(mod,batch_size = batch_size)
   
   if(length(which(pruned_model$partial_corr$Significant == "")) == 0){
     return(pruned_model)
   }
   else{
-    rnm_prune(pruned_model)
+    rnm_prune(pruned_model,batch_size = batch_size)
   }
 }
 
@@ -1138,13 +1226,13 @@ rnm_prune <- function(mod){
 #' @return a list containing the following: 1)value of v of the model which 
 #' gives the best criterion score and 2)free parameters for omega_theta
 #' 
-rnm_lasso_explore <- function(mod, criterion = "BIC", v_values = pracma::logspace(log10(0.01), log10(100), 30) ,lrate= 0.01, epsilon = 0.0001, gamma = 0.5){
+rnm_lasso_explore <- function(mod, criterion = "BIC", v_values = pracma::logspace(log10(0.01), log10(100), 30) ,lrate= 0.01, epsilon = 0.0001, gamma = 0.5, batch_size = batch_size){
   if (mod$lasso == FALSE) {warning('Set lasso to TRUE first!')}
   criterion_values <- vector(mode = 'numeric',length=length(v_values))
   output_params <- list()
   df_values <- vector(mode = 'numeric',length=length(v_values))
   for (i in 1:length(v_values)){
-    mod$lasso_fit(v = v_values[i],lrate = lrate,,epsilon = epsilon)
+    mod$lasso_fit(v = v_values[i],lrate = lrate,epsilon = epsilon, batch_size = batch_size)
     mod$lasso_update_params_added(epsilon = epsilon)
     criterion_values[i] <- mod$get_criterion_value(criterion,gamma)$item()
     df_values[i] <- mod$get_df() 
