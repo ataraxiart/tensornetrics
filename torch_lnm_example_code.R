@@ -5,7 +5,7 @@ remotes::install_github("ataraxiart/tensornetrics")
 library(psych)
 library(psychonetrics)
 library(torch)
-# library(tensornetrics)
+library(tensornetrics)
 library(dplyr)
 library(qgraph)
 

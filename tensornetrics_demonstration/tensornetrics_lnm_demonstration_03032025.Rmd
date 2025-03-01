@@ -1,0 +1,290 @@
+---
+title: "Tensornetrics (Latent Network Model) Demonstration"
+author: "Sammie Lee"
+date: "2025-03-03"
+output: html_document
+---
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE}
+#Use the following to download tensornetrics from Github
+#remotes::install_github("ataraxiart/tensornetrics")
+
+library(psych)
+library(psychonetrics)
+library(torch)
+library(tensornetrics)
+library(dplyr)
+library(qgraph)
+```
+
+
+## Latent Network Model
+
+
+```{r, echo = FALSE}
+knitr::include_graphics("latent_network_model.png")
+```
+
+
+#### **Brief Explanation of Latent Network Model**
+
+A Latent Network Model is similar to a conventional SEM model, just that instead of modelling directional relationships between factors (latent variables), we allow factors to share partial correlations with one another by assuming a multivariate Gaussian distribution for factors. 
+
+**In the diagram above:** 
+
+1) The white circles are our latent variables/factors
+   - Arrows between factors = Partial correlations between factors
+2) The white squares are our observed variables (Like questions in a questionaire)
+   - Arrows from factors to observed variables = Factor Loadings
+3) The shaded circles are our residuals/component unexplained by latent variable
+   - Arrows from residuals to observed variables = Residual Errors
+
+
+
+
+**The equation which models the covariance structure for the latent network model is as follows:**
+
+\begin{equation}
+\Sigma = \Lambda\Delta_\Psi(1 - \Omega_{\Psi})^{-1} \Delta_\Psi \Lambda^\top + \Theta
+\end{equation}
+
+
+#### **Explanation of Matrices**
+
+$\Lambda$ represents the factor loadings. 
+
+$\Omega_{\Psi}$ represents the partial correlations between the factors.
+
+$\Theta$ represents the residual errors.
+
+$\Delta_{\Psi}$ is a scaling matrix.
+
+
+#### **What tensornetrics does w.r.t Latent Network Model**
+
+##### The `tensor_lnm` function
+
+The `tensor_lnm` function in `tensornetrics` fits a Latent Network Model to data obtained (i.e. from a questionaire) but first requires the user to specify a structure for the factor loadings. ($\Lambda$ Matrix) 
+
+Constraints on the partial correlations and residual errors can be specified
+but by default, it assumes all:
+
+1) Partial correlations between latent variables are present 
+2) All residual errors for observed variables are present
+
+`tensor_lnm` is similar to the `lnm` function in `psychonetrics` but uses a Gradient Descent method (Adam optimizer) in Torch to optimize the objective function instead of analytic gradients.
+
+##### Additional functionalities not found in `psychonetrics`
+
+`tensornetrics` also extends the functionalities of `psychonetrics` by allowing for the optimization of custom loss functions and LASSO to find non-zero partial correlations. 
+
+### Concrete Example: Starwars Dataset and Factor Structure
+
+```{r, include = FALSE}
+knitr::include_graphics("starwars_questionaire.png")
+```
+
+
+
+
+
+```{r}
+#Starwars dataset
+data('StarWars')
+
+#Get Design Matrix for lambda
+lambda <- matrix(0, 10, 3)
+lambda[1:4,1] <- 1
+lambda[c(1,5:7),2] <- 1
+lambda[c(1,8:10),3] <- 1
+
+#Indicate names of observed and latent variables
+observedvars <- colnames(StarWars[,1:10])
+latents <- c('Prequels','Originals','Sequels')
+
+```
+
+
+### Estimation of Model
+
+```{r}
+
+#2 ways of instantiating lnm module to ensure uniqueness of model
+
+
+#Variance of latents set to 1
+lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                   identification = "variance")
+
+#Or alternatively identify via loadings, default is via variance
+#first factor loading of each latent variable is set to 1
+
+lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                   identification = "loadings")
+
+
+#Fit using standard log-likelihood fit function
+#Can adjust learning rate to your needs
+lnm$fit(verbose = T, maxit = 5000, lr=0.05, tol = 1e-20) 
+```
+
+
+### Get Partial Correlations, Factor Loadings and Residuals
+
+
+```{r}
+#Access partial correlations
+lnm$get_partial_correlations()
+#After calling get_partial_correlations, correlations can be accessed as lnm$partial_corr
+#print(lnm$partial_corr)
+```
+
+
+```{r}
+#Access factor loadings
+lnm$get_loadings()
+#After calling get_loadings, correlations can be accessed as lnm$loadings
+#print(lnm$loadings)
+```
+
+
+```{r}
+#Access residuals
+lnm$get_residuals()
+#After calling residuals, correlations can be accessed as lnm$loadings
+#print(lnm$residuals)
+```
+
+
+
+### Stepwise Criterion Optimization 
+
+```{r}
+#Perform stepwise procedures, takes a while!
+#Use tensornetrics:: to avoid clash issues with psychonetrics
+stepdown_model <- stepdown(lnm,criterion='BIC')
+final_model <- stepdown_model %>% stepup(criterion = 'BIC')
+```
+
+```{r}
+#View partial correlations of stepup_model
+
+final_model$get_partial_correlations()
+```
+
+
+```{r}
+#View loadings of stepup_model
+
+final_model$get_loadings()
+```
+
+
+```{r}
+#Get criterion of final model:
+
+final_model$get_criterion_value('EBIC',gamma=0)
+final_model$get_fit_metrics()
+
+
+```
+
+### Concrete Example 2: BFI Dataset 
+
+```{r,echo=FALSE}
+knitr::include_graphics("bfi_questionaire.png")
+
+```
+
+```{r}
+#bfi dataset
+
+lambda <- matrix(0, 25, 5)
+lambda[1:5,1] <- 1
+lambda[6:10,2] <- 1
+lambda[11:15,3] <- 1
+lambda[16:20,4] <- 1
+lambda[21:25,5] <- 1
+
+latents <- c('Agreeableness','Conscientiousness','Extraversion','Neuroticism','Openness')
+observedvars <- colnames(bfi)[1:25]
+```
+
+### Custom Loss Function 
+
+```{r}
+
+# Example Code to show the use of a custom loss function
+# We define a custom loss function, LAD estimator with inputs, sigma 
+#(the model covariance matrix) and mod (the lnm module to access its sample covariance attribute)
+
+lad_estimator <- function(sigma, data){
+  get_cov_matrix <- function(data) {
+    data_matrix <- as_array(data)
+    if (!is.null(data_matrix )) {
+      return(cov(data_matrix , use = "pairwise.complete.obs"))  # Handles NAs if present
+    } else {
+      stop("data_matrix is NULL")
+    }
+  }
+  cov_matrix <- get_cov_matrix(data)
+  torch_sum(torch_abs(sigma - cov_matrix))
+}
+
+lnm_custom <-  tensor_lnm(data=bfi%>%na.omit(),lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                   custom_loss = lad_estimator)
+
+lnm_custom$custom_fit(verbose = FALSE)
+lnm_custom$get_partial_correlations()
+
+```
+
+
+### LASSO
+
+
+```{r}
+#Using LASSO to select for pairs of latent variables to include in our network
+
+#Instantiate an lnm module but set lasso to TRUE
+lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=TRUE,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'))
+
+#We use lasso_explore to perform lasso
+#By default algo chooses among 30 values from 0.01 to 100 on a logscale 
+#We set cutoff for partial correlations to be 0.0001
+optimal_parameter <- lasso_explore(lnm_lasso,epsilon = 0.0001,v_values = pracma::logspace(log10(100), log10(10000), 30))
+
+
+#Here, we get a list containing value of v selected and the constraints for omega_psi
+print(optimal_parameter) 
+```
+
+
+
+```{r}
+#Fit the model selected by lasso by substituting in the constraints
+lnm_lasso <- tensor_lnm(data=bfi%>%na.omit(),lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+                        omega_psi_constraint_lst = optimal_parameter[[2]],identification = 'variance')
+lnm_lasso$fit(verbose = FALSE)
+
+#partial correlations of new model
+lnm_lasso$get_partial_correlations()
+```
+
+
+```{r}
+#Get fit metrics for model obtained after lasso
+lnm_lasso$get_fit_metrics() 
+```
+
+
+
+
+
+
+

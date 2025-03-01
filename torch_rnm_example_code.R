@@ -3,7 +3,7 @@ remotes::install_github("ataraxiart/tensornetrics")
 
 library(psychonetrics)
 library(psych)
-#library(tensornetrics)
+library(tensornetrics)
 library(dplyr)
 
 #RNM on self-esteem dataset
