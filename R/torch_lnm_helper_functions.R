@@ -776,7 +776,7 @@ tensor_lnm_stepwise <- torch::nn_module(
     self$cfi <- (1 - (chisq_model-df_model)/(chisq_baseline-df_baseline))$item()
     self$tli <- ((chisq_baseline/df_baseline - chisq_model/df_model)/(chisq_baseline/df_baseline - 1))$item()
     self$rmsea <- sqrt((chisq_model/df_model-1)/(self$num_obs - 1))$item()
-    if (qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)) <= 0){self$rmsea_lower <- 0}
+    if ((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model) <= 0){self$rmsea_lower <- 0}
     else{
       self$rmsea_lower <- sqrt(((qchisq(0.05,df = df_model,ncp = (chisq_model-df_model)$item()) - df_model)/df_model/(self$num_obs-1)))
     }
