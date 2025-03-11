@@ -1,5 +1,10 @@
-# Tensornetrics
+<p align="center">
+  <img src="tensornetrics_logo_edited.jpg" alt="My Image" width="500">
+</p>
+
 ## Network Models with Torch for R
+
+
 
 This R package implements algorithms using **Torch for R** to estimate psychometric network models. Currently, the package supports:
 
