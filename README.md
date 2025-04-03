@@ -8,8 +8,8 @@
 
 This R package implements algorithms using **Torch for R** to estimate psychometric network models. Currently, the package supports:
 
-- **Latent network models (LNM)**
-- **Residual network models (RNM)**
+- **Latent Network Models (LNM)**
+- **Residual Network Models (RNM)**
 - **Random Effects Meta-analytic Gaussian Network Aggregation (MAGNA)** (Coming Soon)
 - **Panel G Models** (Coming Soon)
 
