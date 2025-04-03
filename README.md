@@ -10,6 +10,8 @@ This R package implements algorithms using **Torch for R** to estimate psychomet
 
 - **Latent network models**
 - **Residual network models**
+- **Random Effects MAGNA** (Coming Soon)
+- **Panel G Models** (Coming Soon)
 
 For more information on the theory behind these models, please refer to the publication:  
 [Estimation of Network Models with Latent Variables and Residual Covariances](https://doi.org/10.1007/s11336-017-9557-x).
