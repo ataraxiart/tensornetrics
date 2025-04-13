@@ -13,7 +13,7 @@ This R package implements algorithms using **Torch for R** to estimate psychomet
 - **Random Effects Meta-analytic Gaussian Network Aggregation (MAGNA)** (Coming Soon)
 - **Panel G Models** (Coming Soon)
 
-For more information on the theory behind these models, please refer to the publication:  
+For more information on the theory behind these models, please refer to the following publications:  
 1) LNM and RNM: [Estimation of Network Models with Latent Variables and Residual Covariances](https://doi.org/10.1007/s11336-017-9557-x)
 2) MAGNA: [Meta-analytic Gaussian Network Aggregation](https://doi.org/10.1007/s11336-021-09764-3)
 3) Panel G Models: [Psychometric Network Models from Time Series and Panel Data](https://doi.org/10.1007/s11336-020-09697-3)
