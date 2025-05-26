@@ -1,34 +1,329 @@
 ---
-title: "Tensornetrics (Residual Network Model) Demonstration"
+title: "Tensornetrics - RNM"
 author: "Sammie Lee"
 date: "2025-03-03"
 output: html_document
 ---
 
-## Residual Network Model 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-```{r,fig.align = center}
+```{r, warning = FALSE, message = FALSE}
+#Use the following to download tensornetrics from Github
+#remotes::install_github("ataraxiart/tensornetrics")
+
+library(psych)
+library(psychonetrics)
+library(torch)
+library(tensornetrics)
+library(dplyr)
+library(qgraph)
+```
+
+## **Residual Network Model**
+
+
+#### **Brief Explanation of Residual Network Model**
+
+A Residual Network Model is similar to a conventional SEM model, just that we allow residuals to share partial correlations with one another by assuming a multivariate Gaussian distribution for residuals. 
+
+**In the diagram below:** 
+
+1) The white circles are our latent variables/factors
+   - In the RNM, they can be assumed to be independent/have linear relations between them
+2) The white squares are our observed variables (Like questions in a questionaire)
+   - Arrows from factors to observed variables = Factor Loadings
+3) The shaded circles are our residuals/components unexplained by latent variable
+   - Arrows from residuals to observed variables = Residual Errors
+   - Arrows between residuals = Partial correlations between residuals
+
+
+```{r,echo = FALSE}
 knitr::include_graphics("residual_network_model.png")
+```
 
+**The equation which models the covariance structure $\Sigma$ for the residual network model is as follows:**
+
+\begin{equation}
+\Sigma = \Lambda (1 - B)^{-1}\Psi (1 - B)^{-T}  \Lambda^\top + \Delta_{\theta} (1 - \Omega_{\theta})^{-1} \Delta_{\theta}
+\end{equation}
+
+
+
+
+#### **Explanation of Matrices**
+
+$\Sigma$ represents the model covariance matrix.
+
+$\Lambda$ represents the factor loadings. 
+
+$B$ represents the linear relations between the factors (If any).
+
+$\Psi$ represents the variances and covariances of the factors.
+
+$\Omega_\theta$ represents the partial correlations between the residuals.
+
+$\Delta_\theta$ is a scaling matrix.
+
+
+#### **What tensornetrics does w.r.t Latent Network Model**
+
+##### **The `tensor_rnm` function**
+
+The `tensor_rnm` function in `tensornetrics` fits a Residual Network Model to data obtained (i.e. from a questionaire) but first requires the user to specify a structure for the factor loadings. ($\Lambda$ Matrix) 
+
+Non-zero partial correlations between residuals, constraints on residual errors and linear relations between factors can be specified
+but by default, it assumes all:
+
+1) No partial correlations between residuals are present 
+2) All residual errors for observed variables are present
+3) No linear relations between factors are present
+
+`tensor_rnm` is similar to the `rnm` function in `psychonetrics` but uses a Gradient Descent method (Adam optimizer) in Torch to optimize the objective function instead of analytic gradients.
+
+
+##### **Additional functionalities not found in `psychonetrics`**
+
+`tensornetrics` also extends the functionalities of `psychonetrics` by allowing for the optimization of custom loss functions and LASSO to find non-zero partial correlations.
+
+In this demonstration, we will just show how to use LASSO to find non-zero partial correlations between residuals that we can specify to fit models with better fit. 
+
+
+### **Concrete Example: Self Esteem Dataset**
+
+Our dataset we will use for this demonstration is the `selfEsteem.txt` questionaire found in `tensornetrics` but originally from the resources on the `psychonetrics` webpage. There are 10 questions about self-esteem measured on a 4-point Likert Scale and the proposed factor structure is shown below. 
+
+```{r, echo=FALSE}
+knitr::include_graphics("self_esteem_questionaire.png")
+```
+
+It is hypothesized that:
+
+
+1) Latent Variable 1 affects responses for Q1, Q2, Q4, Q6, Q7
+
+
+2) Latent Variable 2 affects responses for Q3, Q5, Q8, Q9, Q10
+
+
+We will proceed to load the data and specify the structure for the factor loadings. For the purpose of this demonstration, we will split the data into `trainData` (odd values) and `testData` (even values) and train our model on `trainData` first.
+
+```{r}
+#RNM on self-esteem dataset
+
+lambda <- matrix(0,10,2)
+lambda[c(1,2,4,6,7),1] <- 1 # Positive items
+lambda[c(3,5,8,9,10),2] <- 1 # Negative items
+file_path <- system.file("selfEsteem.txt", package = "tensornetrics")
+data <- read.table(file_path,header =TRUE)
+
+trainData <- data[c(TRUE,FALSE),]
+testData <- data[c(FALSE,TRUE),]
+latents <- c('l1','l2')
+vars <- paste0("Q",1:10)
 ```
 
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### **Estimation of Model**
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+**To estimate a model using `tensor_rnm`, we feed the following arguments:**
 
-```{r cars}
-summary(cars)
+1) data - dataframe of our questionaire
+2) lambda - factor structure
+3) vars - names of our observed variables
+4) latents - names of our latent variables
+
+**In the context of our `selfEsteem.txt` example:**
+
+1) data - `trainData`
+2) lambda - `lambda`
+3) vars - `vars`
+4) latents - `latents`
+
+**To ensure uniqueness of the estimated model, there are 2 options:**
+
+1) Setting variance of latent variables to be 1
+2) Setting first factor loadings from each latent variable to be 1
+
+**Fitting the model**
+
+After instantiating the model using `tensor_rnm`, the `fit` method is called to fit the model to data. Note that there are no partial correlations between residuals in this fitted model. 
+
+```{r}
+
+
+#Identify via loadings, default is via variance
+#first factor loading of each latent variable is set to 1
+rnm <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=FALSE,identification = 'loadings')
+
+#Or alternatively have variance of latents set to 1
+rnm <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=FALSE,identification = 'variance')
+
+
+rnm$fit(verbose = TRUE)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+We can get the factor loadings:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+rnm$get_loadings()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+As mentioned, there are no partial correlations in our model if we do not specify which partial correlations should be present in our model.
+
+```{r}
+#By default/initially, no partial correlations are in the model/
+#omega_theta matrix is just a zero matrix
+#We have to perform model selection via lasso 
+rnm$get_partial_correlations()
+```
+
+### **LASSO to find non-zero partial correlations**
+
+Instead of using stepwise procedures to select which partial correlations between residuals to set to non-zero inside our model, we can also apply LASSO to select the partial correlations for us. 
+
+**To do this:** 
+
+1) We instantiate an RNM model using `tensor_rnm` but set `lasso = TRUE` 
+
+2) We use the `lasso_explore` function, specifying the range of hyperparameter values `v_values` to explore and this returns an R list which contains
+
+-The optimal hyperparameter $v$ value
+
+-Partial Correlations to set to non-zero
+
+3) We refit the model found by `lasso_explore` by specifying which partial correlations to set to zero inside `omega_theta_free_lst`
+
+
+```{r}
+#Using LASSO to select for residual partial correlations to include in our network
+
+#Instantiate an rnm module but set lasso to TRUE
+
+rnm <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=TRUE,identification = 'loadings')
+
+#We use lasso_explore to perform lasso
+#By default algo chooses among 30 values from 0.01 to 100 on a logscale 
+#We try from 10000 to 100000 on a logscale here
+#We set cutoff for partial correlations to be 0.0001
+optimal_parameter<- lasso_explore(rnm,epsilon = 0.0001,v_values = pracma::logspace(log10(10000), log10(100000), 30))
+
+#Here, we get a list containing value of v selected and the constraints for omega_theta
+print(optimal_parameter) 
+```
+
+
+
+```{r}
+#Fit the model selected by lasso 
+model_selected_by_lasso<- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                                     lasso=FALSE,identification = 'variance',
+                                     omega_theta_free_lst = optimal_parameter[[2]] )
+
+model_selected_by_lasso$fit(verbose = FALSE)
+
+#partial correlations of new model
+model_selected_by_lasso$get_partial_correlations()
+```
+
+We can further remove the insignificant partial correlations (if any) via the `prune` function in `tensornetrics`.
+
+```{r}
+#We can remove the insignificant partial correlations via the prune function
+final_model <- tensornetrics::prune(model_selected_by_lasso)
+final_model$get_partial_correlations()
+```
+
+We visualize the interactions between the residuals via the `qgraph` package:
+
+```{r}
+qgraph(final_model$omega_theta,layout="circle",
+       title="Interactions between the residuals", 
+       theme = "colorblind",
+       labels = vars, 
+       vsize = 8,
+       color = "gray",
+       mar = rep(6,4))
+box("figure")
+```
+
+We finally get some fit metrics:
+
+```{r}
+#Get final model criterion value and fit metrics
+final_model$get_fit_metrics()
+```
+
+
+
+### **Validation on Test Data**
+
+Lastly, we see how well the model we have found from using `trainData` fits to the `testData`. To do this we just just need to feed `tensor_rnm` the structure of our `omega_theta`(partial correlations between residuals) matrix found in `final_model`.
+
+```{r}
+#Test our omega_theta matrix obtained on our test data
+formatted_omega_mat <-tensornetrics::format_omega_theta(final_model$omega_theta)
+model_on_test <- tensor_rnm(data=testData,lambda,vars=vars,latents=latents,
+                                     lasso=FALSE,identification = 'variance',
+                                     omega_theta_constraint_lst = formatted_omega_mat )
+
+model_on_test$fit(verbose = FALSE)
+model_on_test$get_fit_metrics() #fits v well
+```
+
+
+### **Possible Issues with LASSO**
+
+#### **1) Insufficient DF due to too many non-zero partial correlations**
+
+-The best model returned by model is still underidentified due to too many non-zero parameters.
+
+-The penalty parameter should be increased to force more parameters to zero.
+
+#### **2) Heywood Cases** 
+
+-We fit the model with the non-zero partial correlations between residuals returned by lasso but when we attempt to calculate the standard errors, we get negative variances.
+
+-A possible reason is that the model selected by lasso might still be misspecified
+and alternate values of the penalty value $v$ should be considered again.
+
+```{r}
+
+
+#Possible problems one might encounter when using LASSO
+
+#1) Insufficient DF
+
+#The best model returned here is still underidentified so the penalty parameter should be increased
+#Theoretically, since the objective function is convex and a local minimum exists, the local #solution returned by lasso each time is unique global solution but the number of params estimated #to be non-zero might be too many, leading to model underidentification
+
+rnm_insufficient_df <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=TRUE,identification = 'loadings')
+optimal_value_of_v_insufficient <- 
+  lasso_explore(rnm_insufficient_df,epsilon = 0.0001,v_values = pracma::logspace(log10(0.01), log10(100), 5))
+```
+
+```{r}
+#2) Heywood Cases
+
+#We fit the model with the constraints returned by lasso but when we attempt to calculate
+#the standard errors, we get negative variances
+#A possible reason is that the model selected by lasso might still be a misspecification
+#and alternate values of the penalty value v should be considered again
+rnm_heywood <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=TRUE,identification = 'loadings')
+optimal_value_of_v_heywood <- lasso_explore(rnm_heywood ,epsilon = 0.0001,v_values = pracma::logspace(log10(1000), log10(10000), 5))
+rnm_heywood  <- tensor_rnm(data=trainData,lambda,vars=vars,latents=latents,
+                  lasso=FALSE,identification = 'loadings',omega_theta_free_lst = optimal_value_of_v_heywood[[2]])
+rnm_heywood$fit(verbose=FALSE)
+rnm_heywood$get_partial_correlations()
+
+
+
+```

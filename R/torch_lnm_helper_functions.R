@@ -1,6 +1,3 @@
-library(torch)
-library(lavaan)
-library(pracma)
 
 
 #' Based on the type of matrix, returns a list containing 1)mat_value, a matrix containing the 

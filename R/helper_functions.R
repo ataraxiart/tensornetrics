@@ -1,8 +1,3 @@
-library(torch)
-library(lavaan)
-library(pracma)
-
-
 
 #' For a symmetric matrix A, indicates the indices of 
 #' the entries of the strict lower triangle of A inside vec(A)
@@ -18,8 +13,8 @@ library(pracma)
 #' @param n dimension of the adjacency matrix
 #' @return array of indices
 strict_lower_triangle_idx <- function(n){
-  if (n < 2){
-    warning("n must be at least 2")
+  if (n == 1){
+    return(1)
   }
   idx <- c()
   current_idx <- 1
@@ -130,8 +125,6 @@ vech_dup_idx <- function(n) {
   }
   return(indices + 1)
 }
-
-
 
 
 
@@ -255,7 +248,7 @@ vech_to_symmetric_zero_diag <- function(vech, n) {
   return(mat)
 }
 
-library(Rcpp)
+
 
 
 
@@ -594,7 +587,7 @@ stepdown <- function(mod,criterion = "BIC", gamma = 0.5,batch_size = NULL){
 #'
 #'
 #' @export
-prune <- function(mod,batch_size = NULL){
+prune <- function(mod,batch_size = NULL,...){
   type <- mod$model_type
   if (type == "lnm"){
     lnm_prune(mod,batch_size = batch_size)

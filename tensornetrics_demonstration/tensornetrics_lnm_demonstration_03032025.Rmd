@@ -1,10 +1,10 @@
 ---
-title: "Tensornetrics (Latent Network Model) Demonstration"
+title: "Tensornetrics - LNM"
 author: "Sammie Lee"
 date: "2025-03-03"
 output: html_document
 ---
-## Setup
+## **Setup**
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -23,19 +23,14 @@ library(qgraph)
 ```
 
 
-## Latent Network Model
-
-
-```{r, echo = FALSE}
-knitr::include_graphics("latent_network_model.png")
-```
+## **Latent Network Model**
 
 
 #### **Brief Explanation of Latent Network Model**
 
 A Latent Network Model is similar to a conventional SEM model, just that instead of modelling directional relationships between factors (latent variables), we allow factors to share partial correlations with one another by assuming a multivariate Gaussian distribution for factors. 
 
-**In the diagram above:** 
+**In the diagram below:** 
 
 1) The white circles are our latent variables/factors
    - Arrows between factors = Partial correlations between factors
@@ -44,7 +39,9 @@ A Latent Network Model is similar to a conventional SEM model, just that instead
 3) The shaded circles are our residuals/component unexplained by latent variable
    - Arrows from residuals to observed variables = Residual Errors
 
-
+```{r, echo = FALSE}
+knitr::include_graphics("latent_network_model.png")
+```
 
 
 **The equation which models the covariance structure for the latent network model is as follows:**
@@ -55,6 +52,8 @@ A Latent Network Model is similar to a conventional SEM model, just that instead
 
 
 #### **Explanation of Matrices**
+
+$\Sigma$ represents the model covariance matrix.
 
 $\Lambda$ represents the factor loadings. 
 
@@ -67,7 +66,7 @@ $\Delta_{\Psi}$ is a scaling matrix.
 
 #### **What tensornetrics does w.r.t Latent Network Model**
 
-##### The `tensor_lnm` function
+##### **The `tensor_lnm` function**
 
 The `tensor_lnm` function in `tensornetrics` fits a Latent Network Model to data obtained (i.e. from a questionaire) but first requires the user to specify a structure for the factor loadings. ($\Lambda$ Matrix) 
 
@@ -79,19 +78,29 @@ but by default, it assumes all:
 
 `tensor_lnm` is similar to the `lnm` function in `psychonetrics` but uses a Gradient Descent method (Adam optimizer) in Torch to optimize the objective function instead of analytic gradients.
 
-##### Additional functionalities not found in `psychonetrics`
+##### **Additional functionalities not found in `psychonetrics`**
 
 `tensornetrics` also extends the functionalities of `psychonetrics` by allowing for the optimization of custom loss functions and LASSO to find non-zero partial correlations. 
 
-### Concrete Example: Starwars Dataset and Factor Structure
+### **Concrete Example: Starwars Dataset and Factor Structure**
 
-```{r, include = FALSE}
+Our first dataset we will use for this demonstration is this `Starwars` questionaire found in `psychonetrics`. There are 10 questions about the Star Wars films measured on a 5-point Likert Scale and the proposed factor structure is shown below. 
+
+```{r, echo = FALSE}
 knitr::include_graphics("starwars_questionaire.png")
 ```
 
 
+It is hypothesized that:
+
+1) Love for Prequels affects responses for Q1, Q2, Q3, Q4
+
+2) Love for Originals affects responses for Q1, Q5, Q6, Q7
+
+3) Love for Sequels affects responses for Q1, Q8, Q9, Q10
 
 
+We will proceed to load the data and specify the structure for the factor loadings. 
 
 ```{r}
 #Starwars dataset
@@ -110,7 +119,30 @@ latents <- c('Prequels','Originals','Sequels')
 ```
 
 
-### Estimation of Model
+### **Estimation of Model**
+
+**To estimate a model using `tensor_lnm`, we feed the following arguments:**
+
+1) data - dataframe of our questionaire
+2) lambda - factor structure
+3) vars - names of our observed variables
+4) latents - names of our latent variables
+
+**In the context of our `StarWars` example:**
+
+1) data - `StarWars`
+2) lambda - `lambda`
+3) vars - `observedvars`
+4) latents - `latents`
+
+**To ensure uniqueness of the estimated model, there are 2 options:**
+
+1) Setting variance of latent variables to be 1
+2) Setting first factor loadings from each latent variable to be 1
+
+**Fitting the model**
+
+After instantiating the model using `tensor_lnm`, the `fit` method is called to fit the model to data. 
 
 ```{r}
 
@@ -118,14 +150,16 @@ latents <- c('Prequels','Originals','Sequels')
 
 
 #Variance of latents set to 1
-lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+lnm <-  tensor_lnm(data=StarWars,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
                    identification = "variance")
 
 #Or alternatively identify via loadings, default is via variance
 #first factor loading of each latent variable is set to 1
 
-lnm <-  tensor_lnm(data=StarWars[1:10],lasso=F,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
+lnm <-  tensor_lnm(data=StarWars,lambda=lambda,vars = observedvars, latents= latents,device=torch_device('cpu'),
                    identification = "loadings")
+
+
 
 
 #Fit using standard log-likelihood fit function
@@ -134,35 +168,56 @@ lnm$fit(verbose = T, maxit = 5000, lr=0.05, tol = 1e-20)
 ```
 
 
-### Get Partial Correlations, Factor Loadings and Residuals
+### **Get Partial Correlations, Factor Loadings and Residuals**
+
+After fitting the model to data, we can obtain the partial correlations and their tests for significance using the method `get_partial_correlations`. If one just wants the partial correlations, they are stored in `lnm$omega_psi`.
 
 
 ```{r}
 #Access partial correlations
 lnm$get_partial_correlations()
-#After calling get_partial_correlations, correlations can be accessed as lnm$partial_corr
-#print(lnm$partial_corr)
 ```
 
+We can visualize the partial correlations using the `qgraph` package:
+
+```{r}
+qgraph(lnm$omega_psi,layout="circle",
+       title="Interactions between the various trilogies", 
+       theme = "colorblind",
+       labels = latents, 
+       vsize = 20,
+       color = "gray",
+       mar = rep(6,4))
+box("figure")
+
+```
+
+We can access the factor loadings via `get_loadings()`.
 
 ```{r}
 #Access factor loadings
 lnm$get_loadings()
-#After calling get_loadings, correlations can be accessed as lnm$loadings
-#print(lnm$loadings)
 ```
+
+
+
+We can access the residual errors via `get_residuals()`.
 
 
 ```{r}
 #Access residuals
 lnm$get_residuals()
-#After calling residuals, correlations can be accessed as lnm$loadings
-#print(lnm$residuals)
 ```
 
 
 
-### Stepwise Criterion Optimization 
+### **Stepwise Criterion Optimization** 
+
+Similar to `psychonetrics`, we can also select for partial correlations to leave in our model using stepwise procedures.
+
+1) `stepdown` at each iteration removes one partial correlation which results in the biggest improvement in criterion until the criterion chosen does not improve
+
+2) `stepup` at each iteration adds one partial correlation which results in the biggest improvement in criterion  until the criterion chosen does not improve
 
 ```{r}
 #Perform stepwise procedures, takes a while!
@@ -170,6 +225,8 @@ lnm$get_residuals()
 stepdown_model <- stepdown(lnm,criterion='BIC')
 final_model <- stepdown_model %>% stepup(criterion = 'BIC')
 ```
+
+Again, we view the partial correlations of our final model and view some fit metrics.
 
 ```{r}
 #View partial correlations of stepup_model
@@ -179,27 +236,36 @@ final_model$get_partial_correlations()
 
 
 ```{r}
-#View loadings of stepup_model
+#Get fit metrics of final model:
 
-final_model$get_loadings()
-```
-
-
-```{r}
-#Get criterion of final model:
-
-final_model$get_criterion_value('EBIC',gamma=0)
 final_model$get_fit_metrics()
 
-
 ```
 
-### Concrete Example 2: BFI Dataset 
+
+### **Concrete Example 2: BFI Dataset** 
+
+Our second dataset we will use for this demonstration is this `bfi` questionaire found in the `psych` package. There are 25 questions about the Big-5 aspects of personality measured on a 5-point Likert Scale and the proposed factor structure is shown below. 
+
+We will use this dataset to showcase some functionalities which `tensornetrics` adds to the `psychonetrics` package.
+
 
 ```{r,echo=FALSE}
 knitr::include_graphics("bfi_questionaire.png")
 
 ```
+
+It is hypothesized that:
+
+1) Agreeableness affects responses for Q1 - Q5
+2) Conscientiousness affects responses for Q6 - Q10
+3) Extraversion affects responses for Q11 - Q15
+4) Neuroticism affects responses for Q16 - Q20
+5) Openness affects responses for Q21 - Q25
+
+
+We will proceed to load the data and specify the structure for the factor loadings. 
+
 
 ```{r}
 #bfi dataset
@@ -215,7 +281,20 @@ latents <- c('Agreeableness','Conscientiousness','Extraversion','Neuroticism','O
 observedvars <- colnames(bfi)[1:25]
 ```
 
-### Custom Loss Function 
+### **Custom Loss Function** 
+
+Instead of using the default loss function based on log-likelihood used customarily for SEM models, we can also define our custom loss function to minimize for the estimation of parameters in the model. 
+
+One loss function other than the one based on log-likelihood is the **LAD (Least Absolute Deviation) Estimator** with the following functional form:
+
+\begin{align*}
+&\text{Denote $n$ by $n$ model covariance matrix (with parameter $\theta$) as: } \Sigma(\theta) \\
+&\text{Denote $n$ by $n$ empirical covariance matrix as: } S \\
+&\text{LAD estimator is then} \sum_{i = 1}^n \sum_{j = 1}^n |\Sigma(\theta)_{ij} - S_{ij}|
+\end{align*}
+
+One application of the LAD estimator is the robust estimation of parameters due to outliers. 
+Custom loss functions for `tensornetrics` must have 2 arguments - the model covariance matrix `Sigma` and our observed data `data`. We can define the LAD estimator and feed it into our `tensor_lnm` function. The procedure for estimation is the same as before just that we use `custom_fit` instead.
 
 ```{r}
 
@@ -245,7 +324,21 @@ lnm_custom$get_partial_correlations()
 ```
 
 
-### LASSO
+### **LASSO**
+
+Lastly, instead of using stepwise procedures to select which partial correlations to leave inside our model, we can also apply LASSO to select the partial correlations for us. 
+
+**To do this:** 
+
+1) We instantiate an LNM model using `tensor_lnm` but set `lasso = TRUE` 
+
+2) We use the `lasso_explore` function, specifying the range of hyperparameter values `v_values` to explore and this returns an R list which contains
+
+-The optimal hyperparameter $v$ value
+
+-Partial Correlations to set to zero
+
+3) We refit the model found by `lasso_explore` by specifying which partial correlations to set to zero inside `omega_psi_constraint_lst`
 
 
 ```{r}
@@ -276,6 +369,31 @@ lnm_lasso$fit(verbose = FALSE)
 lnm_lasso$get_partial_correlations()
 ```
 
+
+We can further remove the insignificant partial correlations (if any) via the `prune` function in `tensornetrics`.
+
+```{r}
+#We can remove the insignificant partial correlations via the prune function
+lnm_lasso <- tensornetrics::prune(lnm_lasso)
+lnm_lasso$get_partial_correlations()
+
+```
+
+We visualize the interactions between the latent variables via the `qgraph` package:
+
+```{r}
+qgraph(lnm_lasso$omega_psi,layout="circle",
+       title="Interactions between the big 5", 
+       theme = "colorblind",
+       labels = latents, 
+       vsize = 20,
+       color = "gray",
+       mar = rep(6,4))
+box("figure")
+
+```
+
+We finally get some fit metrics:
 
 ```{r}
 #Get fit metrics for model obtained after lasso

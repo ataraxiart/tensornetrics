@@ -30,6 +30,7 @@
 #' @import torch
 #' @import lavaan
 #' @import stringr
+#' @import dplyr
 #' @importFrom R6 R6Class
 #'
 #' @name tensor_lnm
@@ -41,7 +42,7 @@ tensor_lnm <- torch::nn_module(
   #' @section Methods:
   #'
   #' ## `$initialize(data, lambda, vars, latents)`
-  #' The initialize method. Don't use this, just use [torch_sem()]
+  #' The initialize method. Don't use this, just use [tensor_lnm()]
   #'
   #' ### Arguments
   #' - `data` data the SEM model

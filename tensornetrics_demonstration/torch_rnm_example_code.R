@@ -11,7 +11,7 @@ library(dplyr)
 lambda <- matrix(0,10,2)
 lambda[c(1,2,4,6,7),1] <- 1 # Positive items
 lambda[c(3,5,8,9,10),2] <- 1 # Negative items
-file_path <- system.file( "selfEsteem.txt", package = "tensornetrics")
+file_path <- system.file("selfEsteem.txt", package = "tensornetrics")
 data <- read.table(file_path,header =TRUE)
 
 vars <- paste0("Q",1:10)

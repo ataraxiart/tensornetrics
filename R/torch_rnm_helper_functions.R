@@ -1,9 +1,4 @@
 
-library(torch)
-library(lavaan)
-library(pracma)
-
-
 #' Given a number n (number of observations in dataset), returns a the torch tensor
 #' to represent the free params of the omega delta matrix assuming a saturated model
 #' 
