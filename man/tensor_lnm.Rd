@@ -66,7 +66,7 @@ or to write a new objective function altogether.
 
 
 ## `$initialize(data, lambda, vars, latents)`
-The initialize method. Don't use this, just use [torch_sem()]
+The initialize method. Don't use this, just use [tensor_lnm()]
 
 ### Arguments
 - `data` data the SEM model
